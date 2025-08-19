@@ -1,35 +1,17 @@
 "use server"
 
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
-import { cookies } from "next/headers"
 
 export async function signIn(email: string, password: string) {
   // 检查环境变量是否配置
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  
+
   if (!supabaseUrl || !supabaseKey) {
     throw new Error("Supabase配置缺失，请联系管理员配置环境变量")
   }
 
-  const cookieStore = await cookies()
-
-  const supabase = createSupabaseClient(supabaseUrl, supabaseKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll()
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options)
-          })
-        } catch (error) {
-          // Ignore cookie setting errors
-        }
-      },
-    },
-  })
+  const supabase = createSupabaseClient(supabaseUrl, supabaseKey)
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
@@ -37,6 +19,14 @@ export async function signIn(email: string, password: string) {
   })
 
   if (error) {
+    console.error("Login error details:", error)
+    if (error.message.includes("Invalid login credentials")) {
+      throw new Error("邮箱或密码错误，请检查后重试")
+    } else if (error.message.includes("Email not confirmed")) {
+      throw new Error("请先验证您的邮箱地址")
+    } else if (error.message.includes("Too many requests")) {
+      throw new Error("登录尝试过于频繁，请稍后再试")
+    }
     throw new Error(error.message)
   }
 
@@ -47,29 +37,12 @@ export async function signUp(email: string, password: string) {
   // 检查环境变量是否配置
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  
+
   if (!supabaseUrl || !supabaseKey) {
     throw new Error("Supabase配置缺失，请联系管理员配置环境变量")
   }
 
-  const cookieStore = await cookies()
-
-  const supabase = createSupabaseClient(supabaseUrl, supabaseKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll()
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options)
-          })
-        } catch (error) {
-          // Ignore cookie setting errors
-        }
-      },
-    },
-  })
+  const supabase = createSupabaseClient(supabaseUrl, supabaseKey)
 
   try {
     const { data, error } = await supabase.auth.signUp({
@@ -80,20 +53,20 @@ export async function signUp(email: string, password: string) {
           process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
           `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/auth/callback`,
         data: {
-          email_confirm: false // 禁用邮箱确认以简化流程
-        }
+          email_confirm: false, // 禁用邮箱确认以简化流程
+        },
       },
     })
 
     if (error) {
-      // 提供更友好的错误信息
-      if (error.message.includes('duplicate key') || error.message.includes('already exists')) {
+      console.error("Registration error details:", error)
+      if (error.message.includes("duplicate key") || error.message.includes("already exists")) {
         throw new Error("该邮箱已被注册，请使用其他邮箱或尝试登录")
       }
-      if (error.message.includes('invalid email')) {
+      if (error.message.includes("invalid email")) {
         throw new Error("邮箱格式不正确，请检查后重试")
       }
-      if (error.message.includes('weak password')) {
+      if (error.message.includes("weak password")) {
         throw new Error("密码强度不够，请使用至少6位包含字母和数字的密码")
       }
       throw new Error(`注册失败: ${error.message}`)
@@ -103,16 +76,17 @@ export async function signUp(email: string, password: string) {
     if (data.user && data.user.id) {
       try {
         // 使用服务端权限来创建profile记录
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert({ 
-            id: data.user.id, 
+        const { error: profileError } = await supabase.from("profiles").upsert(
+          {
+            id: data.user.id,
             email: email,
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }, { 
-            onConflict: 'id' 
-          })
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "id",
+          },
+        )
 
         if (profileError) {
           console.warn("Profile creation warning:", profileError.message)
@@ -131,7 +105,7 @@ export async function signUp(email: string, password: string) {
           email: email,
           password: password,
         })
-        
+
         if (signInError) {
           console.warn("Auto sign-in after registration failed:", signInError.message)
         }
@@ -151,29 +125,12 @@ export async function signOut() {
   // 检查环境变量是否配置
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  
+
   if (!supabaseUrl || !supabaseKey) {
     throw new Error("Supabase配置缺失，请联系管理员配置环境变量")
   }
 
-  const cookieStore = await cookies()
-
-  const supabase = createSupabaseClient(supabaseUrl, supabaseKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll()
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options)
-          })
-        } catch (error) {
-          // Ignore cookie setting errors
-        }
-      },
-    },
-  })
+  const supabase = createSupabaseClient(supabaseUrl, supabaseKey)
 
   const { error } = await supabase.auth.signOut()
 
@@ -186,29 +143,12 @@ export async function resetPassword(email: string) {
   // 检查环境变量是否配置
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  
+
   if (!supabaseUrl || !supabaseKey) {
     throw new Error("Supabase配置缺失，请联系管理员配置环境变量")
   }
 
-  const cookieStore = await cookies()
-
-  const supabase = createSupabaseClient(supabaseUrl, supabaseKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll()
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options)
-          })
-        } catch (error) {
-          // Ignore cookie setting errors
-        }
-      },
-    },
-  })
+  const supabase = createSupabaseClient(supabaseUrl, supabaseKey)
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo:
