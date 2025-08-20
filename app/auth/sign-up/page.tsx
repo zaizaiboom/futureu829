@@ -2,6 +2,8 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import SignUpForm from "@/components/sign-up-form"
 
+export const dynamic = "force-dynamic"
+
 export default async function SignUpPage() {
   // 如果Supabase未配置，显示设置消息
   if (!isSupabaseConfigured) {
