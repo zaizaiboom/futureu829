@@ -13,193 +13,144 @@ interface EvaluationRequest {
   stage?: string // Added stage parameter for three-stage evaluation
 }
 
+interface PenaltyResponse {
+  isPenalty: true
+  message: string
+  reason: string
+  suggestions: string[]
+}
+
 interface EvaluationResponse {
   overallScore: number
   coreCompetencyScores: {
-    productThinking: number
+    businessSensitivity: number
+    userEmpathy: number
     technicalUnderstanding: number
-    projectManagement: number
-    businessAcumen: number
-  }
-  performanceScores: {
-    communication: number
-    logicalStructure: number
-    confidence: number
-    adaptability: number
+    dataDrivern: number
+    logicalThinking: number
   }
   rating: string
-  summary: string
-  aiDiagnosis: string
-  coachGuidance: string
-  highlights: Array<{
-    tag: string
-    description: string
+  interviewerReaction: string // Added interviewer's immediate reaction
+  coreDiagnosis: string
+  sentenceAnalysis: Array<{
+    originalText: string
+    problem: string
+    optimizedText: string
   }>
-  improvements: Array<{
-    tag: string
-    description: string
-  }>
-  strategicSuggestions: Array<{
-    tag: string
-    suggestion: string
-    example: string
-  }>
+  competencyRadar: {
+    businessSensitivity: string
+    userEmpathy: string
+    technicalUnderstanding: string
+    dataDrivern: string
+    logicalThinking: string
+  }
+  deepDiveQuestion: string
+  finalSummary: string
+  howToAnswer: {
+    openingPhrase: string
+    keyStructure: string
+    professionalPhrases: string[]
+    avoidPhrases: string[]
+  }
 }
 
 function buildEvaluationPrompt(data: EvaluationRequest): string {
   const stageConfig = getStageConfig(data.stage || "professional")
 
-  return `你是一位资深AI产品总监，拥有10年以上的AI产品管理经验。现在你的角色是一名实战教练，专门帮助候选人快速提升面试表现。你的任务不是评价，而是直接告诉候选人"怎么改才能拿高分"。
+  return `你现在是一个真实的产品经理面试官，刚刚听完候选人的回答。
 
-当前面试阶段：${stageConfig.stageName}
-面试问题：${data.question}
-问题类别：${data.category}
-难度等级：${data.difficulty}
+## 重要：你要像真人面试官一样反应
+- 听到回答的第一反应是什么？直接说出来
+- 不要像机器人一样分析，要像人一样感受
+- 用最自然的话告诉候选人哪里有问题
+- 就像坐在他们对面，直接对话
 
-## ${stageConfig.stageName}评估标准
+## 面试信息
+问题：${data.question}
+候选人回答：${data.userAnswer}
 
-${stageConfig.evaluationCriteria}
+## 你的任务
+像真实面试官一样，给出JSON格式的反馈：
 
-评分关键要点：
-${data.keyPoints.map((point, index) => `${index + 1}. ${point}`).join("\n")}
+{
+  "overallScore": <1-100分>,
+  "coreCompetencyScores": {
+    "businessSensitivity": <1-10>,
+    "userEmpathy": <1-10>,
+    "technicalUnderstanding": <1-10>,
+    "dataDrivern": <1-10>,
+    "logicalThinking": <1-10>
+  },
+  "rating": "<优秀/良好/合格/待提升/需要重新准备>",
+  "interviewerReaction": "<你听到这个回答的第一反应，10-15字，要自然！比如：'嗯...回答太短了'、'不错，思路清晰'、'你没说到重点啊'、'这个回答有点空'、'很好，很专业'、'你确定理解题目了吗？'>",
+  "coreDiagnosis": "<直接说出最大的问题，不要绕弯子。比如：'你没有数据支撑'、'缺少具体案例'、'逻辑不清晰'、'没抓住核心问题'>",
+  "sentenceAnalysis": [
+    {
+      "originalText": "<他说的原话>",
+      "problem": "<这句话具体哪里不对，要直接>",
+      "optimizedText": "<直接告诉他应该怎么说，给出具体的话>"
+    }
+  ],
+  "competencyRadar": {
+    "businessSensitivity": "<差/中/良/优>",
+    "userEmpathy": "<差/中/良/优>", 
+    "technicalUnderstanding": "<差/中/良/优>",
+    "dataDrivern": "<差/中/良/优>",
+    "logicalThinking": "<差/中/良/优>"
+  },
+  "deepDiveQuestion": "<针对他的回答，你会追问什么？>",
+  "finalSummary": "<直接总结他的表现，不要用比喻，就说问题在哪里，怎么改进>",
+  "howToAnswer": {
+    "openingPhrase": "<具体的开场白，可以直接说出来的那种>",
+    "keyStructure": "<回答框架，1234点那种，要具体>",
+    "professionalPhrases": ["<3-5个可以直接用的专业说法>"],
+    "avoidPhrases": ["<不要这么说，要具体指出哪些话不能说>"]
+  }
+}
 
-用户回答：
-${data.userAnswer}
-
-## 实战教练指导要求
-
-### AI诊断格式（直接指出问题）：
-"你的回答有个致命问题：[具体问题]。这让面试官觉得你[负面印象]。要拿高分，你必须[具体改进方向]。"
-
-### 教练指导格式（给出具体改法）：
-"立即这样改：
-1. 开头直接说：'[具体开场白模板]'
-2. 中间加上：'[具体内容模板]'  
-3. 结尾要说：'[具体结尾模板]'
-这样改完，你的回答就能从[当前分数]提升到[目标分数]。"
+## 关键要求：
+1. 所有反馈都要直接，不要绕弯子
+2. 问题诊断要具体，比如"缺少数据"而不是"表达不够充分"
+3. 优化建议要可以直接复制使用
+4. 不要用比喻和形容词，直接说问题
+5. 告诉他具体应该加什么内容，删什么内容
 
 ${stageConfig.specificGuidance}
 
-### 战略建议格式（可直接套用的模板）：
-每个建议必须包含：
-- tag: 具体改进点
-- suggestion: 详细的操作步骤，包含可以直接说的话
-- example: 完整的示例回答片段，用户可以直接参考
-
-### 核心能力维度评分（1-10分）：
-1. **产品思维**：${stageConfig.productThinking}
-2. **技术理解**：${stageConfig.technicalUnderstanding}  
-3. **项目管理**：${stageConfig.projectManagement}
-4. **商业化能力**：${stageConfig.businessAcumen}
-
-### 综合表现维度评分（1-10分）：
-1. **沟通表达**：语言流畅度、专业性、精确性
-2. **逻辑结构**：条理清晰、重点突出、结构完整
-3. **自信度**：表达自信、有说服力
-4. **临场反应**：面对问题的敏捷解决能力
-
-请严格按照以下JSON格式返回评估结果：
-{
-  "overallScore": <综合得分，1-100整数，计算公式：(核心能力平均分*0.7 + 综合表现平均分*0.3)*10>,
-  "coreCompetencyScores": {
-    "productThinking": <产品思维得分，1-10>,
-    "technicalUnderstanding": <技术理解得分，1-10>,
-    "projectManagement": <项目管理得分，1-10>,
-    "businessAcumen": <商业化能力得分，1-10>
-  },
-  "performanceScores": {
-    "communication": <沟通表达得分，1-10>,
-    "logicalStructure": <逻辑结构得分，1-10>,
-    "confidence": <自信度得分，1-10>,
-    "adaptability": <临场反应得分，1-10>
-  },
-  "rating": "<根据总分给出评级：90+为'优秀'，80-89为'良好'，70-79为'合格'，60-69为'待提升'，<60为'需要重新准备'>",
-  "summary": "<简洁的总体表现总结，50-80字>",
-  "aiDiagnosis": "<按照AI诊断格式，直接指出致命问题，80-120字>",
-  "coachGuidance": "<按照教练指导格式，给出具体改法和模板，150-200字>",
-  "highlights": [
-    {
-      "tag": "<具体亮点标签>",
-      "description": "<详细描述该亮点，引用具体内容，60-80字>"
-    }
-  ],
-  "improvements": [
-    {
-      "tag": "<具体问题标签>", 
-      "description": "<直接说出问题和立即改进方法，80-100字>"
-    }
-  ],
-  "strategicSuggestions": [
-    {
-      "tag": "<改进点>",
-      "suggestion": "<详细操作步骤，包含具体话术模板，120-150字>",
-      "example": "<完整的示例回答片段，用户可直接参考，80-120字>"
-    }
-  ]
-}`
+直接输出JSON，不要任何其他格式。`
 }
 
 function getStageConfig(stage: string) {
   switch (stage) {
     case "hr":
       return {
-        stageName: "HR面 - 职业匹配度与潜力评估",
-        evaluationCriteria: `
-评估能力：职业动机、自我认知、沟通协作、职业规划
-
-评估标准：
-- 职业动机真实性（高）：对AI PM岗位的理解是否深入，动机是否源于热爱而非盲从
-- 自我认知清晰度（高）：对自身优势、劣势和未来发展路径是否有清晰规划  
-- 团队协作软实力（高）：能否在复杂团队环境中有效沟通和解决冲突`,
-        productThinking: "用户痛点识别、职业规划与产品理解的结合",
-        technicalUnderstanding: "AI技术基础认知、学习能力展现",
-        projectManagement: "团队协作经验、沟通协调能力",
-        businessAcumen: "职业发展规划、行业理解深度",
+        stageName: "HR面试",
         specificGuidance: `
-### HR面高分模板：
-- **开场必杀技**："我有X年相关经验，专门做过Y类AI产品，最擅长Z技能"
-- **经验量化法**："在上个项目中，我通过XX方法，实现了YY%的提升"
-- **主动提问术**："我想了解这个岗位最大的挑战是什么？"`,
+特别要求：
+- 核心诊断必须直接指出：缺少职业规划、没有团队案例、动机不明确等具体问题
+- 句子分析必须告诉他具体加什么词、删什么词
+- 追问必须针对他回答中的空白点
+- 总结直接说他哪里需要补充，不要用比喻`,
       }
     case "final":
       return {
-        stageName: "终面 - 战略思维与行业洞察评估",
-        evaluationCriteria: `
-评估能力：战略思维、行业洞察、商业模式设计、复杂场景分析
-
-评估标准：
-- 行业洞察力（高）：对AI行业趋势（如Agent、多模态）有前瞻性见解
-- 战略规划能力（高）：能从宏观层面思考产品，并设计可行的商业模式
-- 复杂问题拆解能力（高）：面对开放性难题，能结构化地分析和解决`,
-        productThinking: "战略产品规划、商业模式设计、市场洞察",
-        technicalUnderstanding: "前沿技术趋势理解、技术商业化能力",
-        projectManagement: "复杂项目统筹、资源配置优化",
-        businessAcumen: "商业模式创新、投资回报分析、竞争策略",
+        stageName: "终面",
         specificGuidance: `
-### 终面高分模板：
-- **战略开场**："从行业趋势看，我认为这个问题的核心是..."
-- **格局展现**："我会从用户价值、技术可行性、商业模式三个维度来分析"
-- **决心表达**："我对这个机会非常认真，已经深入研究了贵公司的..."`,
+特别要求：
+- 核心诊断必须直接指出：缺少战略思维、没有行业洞察、格局不够等具体问题
+- 句子分析必须提供高管级别的具体表达
+- 追问必须考察他的认知盲区
+- 总结直接说他的能力边界在哪里`,
       }
-    default: // professional
+    default:
       return {
-        stageName: "专业面 - 硬核能力与实践评估",
-        evaluationCriteria: `
-评估能力：产品设计思维、技术理解力、商业化能力、数据驱动能力
-
-评估标准：
-- 技术理解深度（高）：能否清晰解释AI技术原理，并与产品场景结合
-- 产品落地能力（高）：是否能设计出可行的AI产品方案，并考虑数据飞轮
-- 商业化平衡能力（高）：在追求技术效果的同时，能否兼顾成本、收益和用户价值`,
-        productThinking: "产品方案设计、用户体验优化、数据驱动决策",
-        technicalUnderstanding: "AI技术原理理解、技术方案选择、技术商业化",
-        projectManagement: "跨团队协作、项目推进、风险管控",
-        businessAcumen: "ROI分析、成本效益平衡、商业价值创造",
+        stageName: "专业面试",
         specificGuidance: `
-### 专业面高分模板：
-- **结论先行**："我的建议是XX，主要基于三个考虑..."
-- **技术落地**："从技术角度，我会选择XX方案，因为它能平衡效果和成本"
-- **数据证明**："根据我的经验，这样做通常能带来XX%的提升"`,
+特别要求：
+- 核心诊断必须直接指出：缺少产品思维、技术理解不足、没有用户视角等具体问题
+- 句子分析必须告诉他产品经理应该怎么表达
+- 追问必须针对他的专业能力空白
+- 总结直接说他的专业水平和需要提升的具体方面`,
       }
   }
 }
@@ -250,9 +201,102 @@ function cleanJsonResponse(content: string): string {
   return cleaned
 }
 
+function detectLowQualityAnswer(userAnswer: string, question: string): PenaltyResponse | null {
+  const answer = userAnswer.trim().toLowerCase()
+  const questionWords = question
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((word) => word.length > 3)
+
+  // Check for empty or too short answers
+  if (answer.length < 10) {
+    return {
+      isPenalty: true,
+      message: "请认真作答再继续解析",
+      reason: "回答内容过于简短，无法进行有效评估",
+      suggestions: ["请提供至少50字以上的详细回答", "结合具体案例或经验来阐述你的观点", "展示你的思考过程和分析逻辑"],
+    }
+  }
+
+  // Check for random/nonsensical content
+  const randomPatterns = [
+    /^[a-z\s]*$/i, // Only letters and spaces (likely random typing)
+    /(.)\1{4,}/, // Repeated characters (aaaaa, 11111)
+    /^[0-9\s]*$/, // Only numbers and spaces
+    /^[^\u4e00-\u9fa5a-zA-Z]*$/, // No Chinese or English characters
+  ]
+
+  for (const pattern of randomPatterns) {
+    if (pattern.test(answer) && answer.length < 50) {
+      return {
+        isPenalty: true,
+        message: "请认真作答再继续解析",
+        reason: "检测到无意义的随机输入",
+        suggestions: ["请用中文或英文认真回答问题", "避免输入无关的字符或数字", "展示你对问题的真实理解和思考"],
+      }
+    }
+  }
+
+  // Check for completely irrelevant answers
+  const commonIrrelevantPhrases = [
+    "不知道",
+    "不清楚",
+    "没想过",
+    "随便",
+    "无所谓",
+    "都行",
+    "看情况",
+    "i don't know",
+    "no idea",
+    "whatever",
+    "anything",
+    "doesn't matter",
+  ]
+
+  const hasRelevantContent = questionWords.some(
+    (word) => answer.includes(word) || answer.includes(word.substring(0, 3)),
+  )
+
+  const isIrrelevant =
+    commonIrrelevantPhrases.some((phrase) => answer.includes(phrase)) && !hasRelevantContent && answer.length < 100
+
+  if (isIrrelevant) {
+    return {
+      isPenalty: true,
+      message: "请认真作答再继续解析",
+      reason: "回答与问题不相关或过于敷衍",
+      suggestions: ["请仔细阅读问题并针对性回答", "分享你的真实想法和经验", "即使不确定也请尝试分析和思考"],
+    }
+  }
+
+  // Check for copy-paste or template answers
+  const templatePhrases = [
+    "根据我的理解",
+    "我认为这个问题",
+    "首先其次最后",
+    "综上所述",
+    "in my opinion",
+    "first second third",
+    "in conclusion",
+  ]
+
+  const templateCount = templatePhrases.filter((phrase) => answer.includes(phrase.toLowerCase())).length
+
+  if (templateCount >= 3 && answer.length < 200) {
+    return {
+      isPenalty: true,
+      message: "请认真作答再继续解析",
+      reason: "回答过于模板化，缺乏个人思考",
+      suggestions: ["请用自己的话来表达观点", "结合具体的工作经验或案例", "展示你独特的思考角度和见解"],
+    }
+  }
+
+  return null
+}
+
 export async function POST(request: NextRequest) {
   try {
-    console.log("🚀 [API] 开始处理教练式评估请求")
+    console.log("🚀 [API] 开始处理API式教练评估请求")
 
     if (!SILICONFLOW_API_KEY) {
       console.error("❌ [API] SiliconFlow API密钥未配置")
@@ -266,11 +310,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body: EvaluationRequest = await request.json()
-    console.log("📝 [API] 收到教练式评估请求:", {
+    console.log("📝 [API] 收到API式教练评估请求:", {
       questionId: body.questionId,
       category: body.category,
       difficulty: body.difficulty,
-      stage: body.stage || "professional", // Log stage information
+      stage: body.stage || "professional",
       answerLength: body.userAnswer?.length,
     })
 
@@ -279,13 +323,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
+    const penaltyCheck = detectLowQualityAnswer(body.userAnswer, body.question)
+    if (penaltyCheck) {
+      console.log("⚠️ [惩罚机制] 检测到低质量回答，触发拒绝评分:", penaltyCheck.reason)
+      return NextResponse.json(penaltyCheck, { status: 422 }) // 422 Unprocessable Entity
+    }
+
     const prompt = buildEvaluationPrompt(body)
-    console.log("📋 [API] 构建教练式提示词完成")
+    console.log("📋 [API] 构建API式提示词完成")
 
     const requestPayload = {
       model: "deepseek-ai/DeepSeek-V3",
       messages: [{ role: "user", content: prompt }],
-      temperature: 0.3,
+      temperature: 0.2, // Reduced temperature for more consistent API-like responses
       max_tokens: 3000,
     }
 
@@ -320,33 +370,29 @@ export async function POST(request: NextRequest) {
 
       try {
         evaluationResult = JSON.parse(cleanedContent)
+
+        if (
+          !evaluationResult.coreDiagnosis ||
+          !evaluationResult.sentenceAnalysis ||
+          !evaluationResult.deepDiveQuestion ||
+          !evaluationResult.interviewerReaction // Added validation for interviewer reaction
+        ) {
+          console.warn("⚠️ [API] 响应格式不完整，可能触发拒绝评分机制")
+        }
       } catch (parseError) {
         console.error("❌ [JSON解析] 详细错误信息:", parseError)
         console.error("🔍 [JSON解析] 清理后内容前500字符:", cleanedContent.substring(0, 500))
-        console.error(
-          "🔍 [JSON解析] 清理后内容后500字符:",
-          cleanedContent.substring(Math.max(0, cleanedContent.length - 500)),
-        )
-
-        // Try to identify the problematic character position
-        if (parseError instanceof SyntaxError && parseError.message.includes("position")) {
-          const match = parseError.message.match(/position (\d+)/)
-          if (match) {
-            const position = Number.parseInt(match[1])
-            const context = cleanedContent.substring(Math.max(0, position - 50), position + 50)
-            console.error("🎯 [JSON解析] 错误位置上下文:", context)
-          }
-        }
 
         throw parseError
       }
 
-      console.log("✅ [API] 教练式评估解析成功:", {
+      console.log("✅ [API] API式教练评估解析成功:", {
         overallScore: evaluationResult.overallScore,
         rating: evaluationResult.rating,
-        hasAiDiagnosis: !!evaluationResult.aiDiagnosis, // Log new coaching fields
-        hasCoachGuidance: !!evaluationResult.coachGuidance,
-        highlightsCount: evaluationResult.highlights?.length,
+        hasCoreDiagnosis: !!evaluationResult.coreDiagnosis,
+        sentenceAnalysisCount: evaluationResult.sentenceAnalysis?.length,
+        hasDeepDiveQuestion: !!evaluationResult.deepDiveQuestion,
+        hasInterviewerReaction: !!evaluationResult.interviewerReaction, // Added interviewer reaction to success log
       })
     } catch (parseError) {
       console.error("❌ [API] JSON解析失败:", parseError)
@@ -355,13 +401,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(evaluationResult)
   } catch (error) {
-    console.error("💥 [API] 教练式评估API错误:", error)
+    console.error("💥 [API] API式教练评估错误:", error)
 
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
     return NextResponse.json(
       {
         error: errorMessage,
-        message: "AI教练服务暂时不可用，请稍后再试",
+        message: "AI教练API服务暂时不可用，请稍后再试",
       },
       { status: 500 },
     )

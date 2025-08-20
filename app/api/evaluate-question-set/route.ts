@@ -59,6 +59,12 @@ async function processEvaluation(
   questionSetIndex: number,
   evaluationId?: string,
 ) {
+  const apiKey = process.env.SILICONFLOW_API_KEY
+  if (!apiKey) {
+    console.error("💥 [API] SILICONFLOW_API_KEY 环境变量未设置")
+    throw new Error("AI服务配置错误：缺少API密钥")
+  }
+
   const evaluationPrompt = `
 你是一位专业的AI产品经理面试官，请用友好但直接的方式对候选人进行评估。采用轻松调侃但专业的语调，让反馈更加生动有趣。
 
@@ -166,11 +172,16 @@ ${questions
 `
 
   try {
+    console.log("🚀 [API] 开始调用AI服务，API Key存在:", !!apiKey)
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30秒超时
+
     const aiResponse = await fetch("https://api.siliconflow.cn/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.SILICONFLOW_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model: "deepseek-ai/DeepSeek-V3",
@@ -185,19 +196,31 @@ ${questions
             content: evaluationPrompt,
           },
         ],
-        temperature: 0.5, // 降低温度值，提高输出稳定性
+        temperature: 0.5,
         max_tokens: 3000,
       }),
+      signal: controller.signal,
     })
 
+    clearTimeout(timeoutId)
+
+    console.log("📡 [API] AI服务响应状态:", aiResponse.status, aiResponse.statusText)
+
     if (!aiResponse.ok) {
-      throw new Error(`AI服务响应错误: ${aiResponse.status}`)
+      const errorText = await aiResponse.text().catch(() => "无法读取错误信息")
+      console.error("💥 [API] AI服务响应错误:", {
+        status: aiResponse.status,
+        statusText: aiResponse.statusText,
+        errorText: errorText.substring(0, 200),
+      })
+      throw new Error(`AI服务响应错误: ${aiResponse.status} ${aiResponse.statusText}`)
     }
 
     const aiResult = await aiResponse.json()
     const evaluationText = aiResult.choices[0]?.message?.content
 
     if (!evaluationText) {
+      console.error("💥 [API] AI服务返回空结果:", aiResult)
       throw new Error("AI服务返回空结果")
     }
 
@@ -244,8 +267,16 @@ ${questions
 
     return evaluationResult
   } catch (error) {
-    console.error("💥 [API] 评估过程出错:", error)
-    return createFallbackEvaluation(stageType, answers)
+    if (error.name === "AbortError") {
+      console.error("💥 [API] 请求超时:", error)
+      throw new Error("AI服务请求超时，请稍后重试")
+    } else if (error.message?.includes("fetch")) {
+      console.error("💥 [API] 网络连接失败:", error)
+      throw new Error("网络连接失败，请检查网络连接后重试")
+    } else {
+      console.error("💥 [API] 评估过程出错:", error)
+      throw new Error(`评估失败: ${error.message || "未知错误"}`)
+    }
   }
 }
 
