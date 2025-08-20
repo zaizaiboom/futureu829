@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { User, Settings, LogOut, BarChart3, BookOpen } from "lucide-react"
+import Link from "next/link"
 
 interface UserMenuProps {
   userEmail: string
@@ -48,9 +49,11 @@ export default function UserMenu({ userEmail, onLogout }: UserMenuProps) {
           <BarChart3 className="mr-2 h-4 w-4" />
           <span>学习报告</span>
         </DropdownMenuItem>
-        <DropdownMenuItem>
-          <BookOpen className="mr-2 h-4 w-4" />
-          <span>练习记录</span>
+        <DropdownMenuItem asChild>
+          <Link href="/practice-history" className="flex items-center">
+            <BookOpen className="mr-2 h-4 w-4" />
+            <span>练习记录</span>
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuItem>
           <Settings className="mr-2 h-4 w-4" />
