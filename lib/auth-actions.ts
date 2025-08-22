@@ -1,17 +1,9 @@
 "use server"
 
-import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { createClient } from "@/lib/supabase/server"
 
 export async function signIn(email: string, password: string) {
-  // 检查环境变量是否配置
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error("Supabase配置缺失，请联系管理员配置环境变量")
-  }
-
-  const supabase = createSupabaseClient(supabaseUrl, supabaseKey)
+  const supabase = await createClient()
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
@@ -34,15 +26,7 @@ export async function signIn(email: string, password: string) {
 }
 
 export async function signUp(email: string, password: string) {
-  // 检查环境变量是否配置
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error("Supabase配置缺失，请联系管理员配置环境变量")
-  }
-
-  const supabase = createSupabaseClient(supabaseUrl, supabaseKey)
+  const supabase = await createClient()
 
   try {
     const { data, error } = await supabase.auth.signUp({
@@ -122,15 +106,7 @@ export async function signUp(email: string, password: string) {
 }
 
 export async function signOut() {
-  // 检查环境变量是否配置
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error("Supabase配置缺失，请联系管理员配置环境变量")
-  }
-
-  const supabase = createSupabaseClient(supabaseUrl, supabaseKey)
+  const supabase = await createClient()
 
   const { error } = await supabase.auth.signOut()
 
@@ -140,15 +116,7 @@ export async function signOut() {
 }
 
 export async function resetPassword(email: string) {
-  // 检查环境变量是否配置
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error("Supabase配置缺失，请联系管理员配置环境变量")
-  }
-
-  const supabase = createSupabaseClient(supabaseUrl, supabaseKey)
+  const supabase = await createClient()
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo:

@@ -388,23 +388,20 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
 
   // 智能标点符号添加
   const addSmartPunctuation = (text: string): string => {
-    if (!text) return text
+  if (typeof text !== 'string' || !text.trim()) return '';
 
-    let result = text.trim()
+  let result = text.trim();
 
-    // 如果文本不以标点符号结尾，根据语调添加标点
-    if (!/[。！？，、；：]$/.test(result)) {
-      // 检查是否是疑问句
-      if (/^(什么|怎么|为什么|哪里|哪个|如何|是否|能否|可以|会不会)/.test(result) || /吗$/.test(result)) {
-        result += "？"
-      } else {
-        result += "。"
-      }
+  if (!/[。！？，、；：]$/.test(result)) {
+    if (/^(什么|怎么|为什么|哪里|哪个|如何|是否|能否|可以|会不会)/.test(result.toLowerCase()) || /吗$/.test(result)) {
+      result += "？";
+    } else {
+      result += "。";
     }
-
-    // 添加适当的空格
-    return " " + result
   }
+
+  return " " + result;
+}
 
   // 加载题目和历史记录
   useEffect(() => {
@@ -474,6 +471,50 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
     }
   }
 
+  // 保存练习记录到数据库
+  const savePracticeSession = async (evaluationResult: QualitativeEvaluationResponse, answers: string[]) => {
+    try {
+      const practiceData = {
+        stage_type: moduleType,
+        questions_and_answers: questions.map((question, index) => ({
+          question: question.question_text,
+          answer: answers[index] || '',
+          question_id: question.id
+        })),
+        evaluation_score: evaluationResult.performanceLevel === '优秀表现' ? 90 : 
+                         evaluationResult.performanceLevel === '良好表现' ? 75 : 60,
+        ai_feedback: {
+          summary: evaluationResult.summary,
+          strengths: evaluationResult.strengths,
+          improvements: evaluationResult.improvements,
+          nextSteps: evaluationResult.nextSteps,
+          encouragement: evaluationResult.encouragement
+        }
+      }
+
+      console.log("💾 [前端] 保存练习记录:", practiceData)
+
+      const response = await fetch('/api/practice-sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(practiceData),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || '保存练习记录失败')
+      }
+
+      const result = await response.json()
+      console.log("✅ [前端] 练习记录保存成功:", result)
+    } catch (error) {
+      console.error("💥 [前端] 保存练习记录失败:", error)
+      throw error
+    }
+  }
+
   // 提交所有答案进行评估
   const submitAllAnswers = async (allAnswers: string[]) => {
     console.log("🎯 [前端] 提交阶段答案:", {
@@ -527,6 +568,10 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
         const newHistory = [...history, evaluationResult]
         setHistory(newHistory)
         localStorage.setItem(`interviewHistory_${moduleType}`, JSON.stringify(newHistory))
+        
+        // 保存练习记录到数据库
+        await savePracticeSession(evaluationResult, allAnswers)
+        
         console.log("✅ [前端] 评估完成:", evaluationResult.performanceLevel)
       } else {
         throw new Error("评估结果格式错误")
@@ -542,6 +587,14 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
       const newHistory = [...history, fallbackResult]
       setHistory(newHistory)
       localStorage.setItem(`interviewHistory_${moduleType}`, JSON.stringify(newHistory))
+      
+      // 保存备用评估结果到数据库
+      try {
+        await savePracticeSession(fallbackResult, allAnswers)
+      } catch (saveError) {
+        console.error("💥 [前端] 保存练习记录失败:", saveError)
+      }
+      
       console.log("🔄 [前端] 使用备用评估结果")
     } finally {
       setIsEvaluating(false)

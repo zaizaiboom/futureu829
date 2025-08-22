@@ -188,13 +188,12 @@ export default function AuthModal({ isOpen, onClose, onLogin, onRegister, onForg
             </form>
 
             <div className="text-center space-y-2">
-              <button
-                type="button"
-                onClick={() => setMode("forgot")}
+              <a
+                href="/auth/forgot-password"
                 className="text-sm text-blue-600 hover:text-blue-800 underline"
               >
                 忘记密码？
-              </button>
+              </a>
               <div className="text-sm text-gray-600">
                 还没有账户？{" "}
                 <button

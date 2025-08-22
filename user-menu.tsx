@@ -41,13 +41,17 @@ export default function UserMenu({ userEmail, onLogout }: UserMenuProps) {
           </div>
         </div>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
-          <User className="mr-2 h-4 w-4" />
-          <span>个人资料</span>
+        <DropdownMenuItem asChild>
+          <Link href="/profile" className="flex items-center">
+            <User className="mr-2 h-4 w-4" />
+            <span>个人资料</span>
+          </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem>
-          <BarChart3 className="mr-2 h-4 w-4" />
-          <span>学习报告</span>
+        <DropdownMenuItem asChild>
+          <Link href="/learning-report" className="flex items-center">
+            <BarChart3 className="mr-2 h-4 w-4" />
+            <span>学习报告</span>
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/practice-history" className="flex items-center">
@@ -55,9 +59,11 @@ export default function UserMenu({ userEmail, onLogout }: UserMenuProps) {
             <span>练习记录</span>
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Settings className="mr-2 h-4 w-4" />
-          <span>设置</span>
+        <DropdownMenuItem asChild>
+          <Link href="/settings" className="flex items-center">
+            <Settings className="mr-2 h-4 w-4" />
+            <span>设置</span>
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onLogout}>
