@@ -2,6 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  // 1. response 对象只在这里创建一次
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -16,23 +17,15 @@ export async function middleware(request: NextRequest) {
         get(name: string) {
           return request.cookies.get(name)?.value
         },
+        // 2. set 方法只修改 request 和 response，不再重新创建 response
         set(name: string, value: string, options: CookieOptions) {
           request.cookies.set({ name, value, ...options })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
           response.cookies.set({ name, value, ...options })
         },
+        // 3. remove 方法也只修改 request 和 response
         remove(name: string, options: CookieOptions) {
           request.cookies.set({ name, value: '', ...options })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          response.cookies.delete({ name, ...options })
+          response.cookies.set({ name, value: '', ...options })
         },
       },
     }
@@ -42,6 +35,7 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // --- 你的路由保护逻辑保持不变 ---
   const protectedRoutes = ['/profile', '/settings', '/learning-report', '/practice-history']
   const { pathname } = request.nextUrl
 
@@ -55,19 +49,13 @@ export async function middleware(request: NextRequest) {
     const redirectTo = request.nextUrl.searchParams.get('redirectTo')
     return NextResponse.redirect(new URL(redirectTo || '/profile', request.url))
   }
+  // --- 路由保护逻辑结束 ---
 
   return response
 }
 
-// 配置这个中间件在哪些路径上运行
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 }

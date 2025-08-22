@@ -6,12 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { Calendar, Filter, TrendingUp, TrendingDown, Clock, Eye, BarChart3, History } from 'lucide-react'
+import { Calendar, Filter, Clock, Eye, Target, CheckCircle, AlertTriangle, Lightbulb, History } from 'lucide-react'
 import { format } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import Link from 'next/link'
 import Navigation from '@/components/navigation'
+import { QualitativeFeedback, generateMockQualitativeFeedback, qualitativeAnalytics } from '@/lib/qualitative-analytics'
 
 interface PracticeSession {
   id: string
@@ -19,10 +19,6 @@ interface PracticeSession {
   stage_id: number
   category_id: number
   user_answer: string
-  overall_score: number
-  content_score: number
-  logic_score: number
-  expression_score: number
   ai_feedback: string
   practice_duration: number
   created_at: string
@@ -35,6 +31,8 @@ interface PracticeSession {
   question_categories: {
     category_name: string
   }
+  // 新增定性反馈数据
+  qualitative_feedback?: QualitativeFeedback
 }
 
 interface FilterOptions {
@@ -53,9 +51,7 @@ interface PracticeHistoryClientProps {
 
 const SORT_OPTIONS = [
   { value: 'created_at_desc', label: '最新练习' },
-  { value: 'created_at_asc', label: '最早练习' },
-  { value: 'overall_score_desc', label: '分数从高到低' },
-  { value: 'overall_score_asc', label: '分数从低到高' }
+  { value: 'created_at_asc', label: '最早练习' }
 ]
 
 const DATE_RANGE_OPTIONS = [
@@ -106,30 +102,12 @@ export function PracticeHistoryClient({ user, sessions, stages, categories }: Pr
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         case 'created_at_asc':
           return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        case 'overall_score_desc':
-          return b.overall_score - a.overall_score
-        case 'overall_score_asc':
-          return a.overall_score - b.overall_score
         default:
           return 0
       }
     })
 
     setFilteredSessions(filtered)
-  }
-
-  const getScoreColor = (score: number) => {
-    if (score >= 90) return 'text-green-600'
-    if (score >= 80) return 'text-blue-600'
-    if (score >= 70) return 'text-yellow-600'
-    return 'text-red-600'
-  }
-
-  const getScoreBgColor = (score: number) => {
-    if (score >= 90) return 'bg-green-100'
-    if (score >= 80) return 'bg-blue-100'
-    if (score >= 70) return 'bg-yellow-100'
-    return 'bg-red-100'
   }
 
   const formatDuration = (seconds: number) => {
@@ -148,16 +126,28 @@ export function PracticeHistoryClient({ user, sessions, stages, categories }: Pr
     return colors[(stageId - 1) % colors.length] || 'bg-gray-100 text-gray-800'
   }
 
-  const calculateStats = () => {
-    const totalSessions = filteredSessions.length
-    const averageScore = totalSessions > 0 
-      ? Math.round(filteredSessions.reduce((sum, session) => sum + session.overall_score, 0) / totalSessions)
-      : 0
-    
-    return { totalSessions, averageScore }
+  // 生成模拟的定性反馈数据（实际应用中应从后端获取）
+  const getQualitativeFeedback = (sessionId: string): QualitativeFeedback => {
+    const mockData = generateMockQualitativeFeedback(1)[0]
+    return {
+      ...mockData,
+      sessionId
+    }
   }
 
-  const { totalSessions, averageScore } = calculateStats()
+  // 获取核心提升点
+  const getCoreImprovementArea = () => {
+    const allFeedbacks = sessions.map(session => getQualitativeFeedback(session.id))
+    return qualitativeAnalytics.getMostFrequentSuggestion(allFeedbacks)
+  }
+
+  const calculateStats = () => {
+    const totalSessions = filteredSessions.length
+    
+    return { totalSessions }
+  }
+
+  const { totalSessions } = calculateStats()
 
   return (
     <>
@@ -254,19 +244,16 @@ export function PracticeHistoryClient({ user, sessions, stages, categories }: Pr
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white">
+            <Card className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-blue-100 text-sm">平均分数</p>
-                    <p className="text-3xl font-bold">
-                      {sessions.length > 0 
-                        ? Math.round(sessions.reduce((sum, session) => sum + session.overall_score, 0) / sessions.length)
-                        : 0
-                      }
+                    <p className="text-orange-100 text-sm">核心提升点</p>
+                    <p className="text-lg font-bold truncate">
+                      {sessions.length > 0 ? getCoreImprovementArea() : '暂无数据'}
                     </p>
                   </div>
-                  <BarChart3 className="h-8 w-8 text-blue-200" />
+                  <Lightbulb className="h-8 w-8 text-orange-200" />
                 </div>
               </CardContent>
             </Card>
@@ -302,78 +289,124 @@ export function PracticeHistoryClient({ user, sessions, stages, categories }: Pr
             </Card>
           ) : (
             <div className="space-y-4">
-              {filteredSessions.map((session) => (
-                <Card key={session.id} className="hover:shadow-lg transition-all duration-300 group border-l-4 border-l-purple-500">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        {/* 练习信息头部 */}
-                        <div className="flex items-center gap-4 mb-4">
-                          <div className="flex items-center gap-2 text-gray-600">
-                            <Calendar className="h-4 w-4" />
-                            <span className="font-medium">
-                              {format(new Date(session.created_at), 'yyyy年MM月dd日', { locale: zhCN })}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-gray-600">
-                            <Clock className="h-4 w-4" />
-                            <span>{formatDuration(session.practice_duration)}</span>
-                          </div>
-                          <Badge className={getStageColor(session.stage_id)}>
-                            {session.interview_stages?.stage_name ?? '未知阶段'}
-                          </Badge>
-                          <Badge variant="outline">
-                            {session.question_categories?.category_name ?? '未知类别'}
-                          </Badge>
-                        </div>
-
-                        {/* 问题内容 */}
-                        <div className="mb-4">
-                          <p className="text-gray-900 font-medium mb-2">练习问题:</p>
-                          <p className="text-gray-700 bg-gray-50 p-3 rounded-lg border-l-4 border-l-purple-300">
-                            {session.interview_questions?.question_text ?? '未知问题'}
-                          </p>
-                        </div>
-
-                        {/* 分数展示 */}
-                        <div className="flex items-center gap-4 mb-4">
-                          <div className={`${getScoreBgColor(session.overall_score)} rounded-lg p-3 flex-1`}>
-                            <div className="text-xs text-gray-600 mb-1">综合得分</div>
-                            <div className={`text-2xl font-bold ${getScoreColor(session.overall_score)}`}>
-                              {session.overall_score}
+              {filteredSessions.map((session) => {
+                const feedback = getQualitativeFeedback(session.id)
+                // 获取最多2个亮点和2个建议
+                const displayHighlights = feedback.highlights.slice(0, 2)
+                const displaySuggestions = feedback.suggestions.slice(0, 2)
+                
+                // 根据严重性等级获取图标和样式
+                const getSeverityIcon = (severity?: string) => {
+                  switch (severity) {
+                    case 'critical': return '❌'
+                    case 'moderate': return '⚠️'
+                    case 'minor': return '💡'
+                    default: return '⚠️'
+                  }
+                }
+                
+                const getSeverityStyle = (severity?: string) => {
+                  switch (severity) {
+                    case 'critical': return 'bg-red-100 text-red-800 border-red-200'
+                    case 'moderate': return 'bg-orange-100 text-orange-800 border-orange-200'
+                    case 'minor': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                    default: return 'bg-orange-100 text-orange-800 border-orange-200'
+                  }
+                }
+                
+                return (
+                  <Card key={session.id} className="hover:shadow-lg transition-all duration-300 group border-l-4 border-l-purple-500">
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          {/* 练习信息头部 */}
+                          <div className="flex items-center gap-4 mb-4">
+                            <div className="flex items-center gap-2 text-gray-600">
+                              <Calendar className="h-4 w-4" />
+                              <span className="font-medium">
+                                {format(new Date(session.created_at), 'yyyy年MM月dd日', { locale: zhCN })}
+                              </span>
                             </div>
-                            <Progress value={session.overall_score} className="mt-2" />
+                            <div className="flex items-center gap-2 text-gray-600">
+                              <Clock className="h-4 w-4" />
+                              <span>{formatDuration(session.practice_duration)}</span>
+                            </div>
+                            <Badge className={getStageColor(session.stage_id)}>
+                              {session.interview_stages?.stage_name ?? '未知阶段'}
+                            </Badge>
+                            <Badge variant="outline">
+                              {session.question_categories?.category_name ?? '未知类别'}
+                            </Badge>
                           </div>
-                          <div className="bg-gray-50 rounded-lg p-2">
-                            <div className="text-xs text-gray-600">内容</div>
-                            <div className="font-semibold text-sm">{session.content_score}</div>
-                          </div>
-                          <div className="bg-gray-50 rounded-lg p-2">
-                            <div className="text-xs text-gray-600">逻辑</div>
-                            <div className="font-semibold text-sm">{session.logic_score}</div>
-                          </div>
-                          <div className="bg-gray-50 rounded-lg p-2">
-                            <div className="text-xs text-gray-600">表达</div>
-                            <div className="font-semibold text-sm">{session.expression_score}</div>
-                          </div>
-                        </div>
 
-                        {/* 查看详情按钮 */}
-                        <Button 
-                          variant="outline" 
-                          className="border-purple-200 text-purple-700 hover:bg-purple-50 hover:border-purple-300 group-hover:bg-gradient-to-r group-hover:from-purple-600 group-hover:to-pink-600 group-hover:text-white group-hover:border-transparent transition-all duration-300"
-                          asChild
-                        >
-                          <Link href={`/practice-history/${session.id}`}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            查看详情
-                          </Link>
-                        </Button>
+                          {/* 问题内容 */}
+                          <div className="mb-4">
+                            <p className="text-gray-900 font-medium mb-2">练习问题:</p>
+                            <p className="text-gray-700 bg-gray-50 p-3 rounded-lg border-l-4 border-l-purple-300">
+                              {session.interview_questions?.question_text ?? '未知问题'}
+                            </p>
+                          </div>
+
+                          {/* AI核心诊断 */}
+                          <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4 mb-4">
+                            <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                              <Target className="h-4 w-4" />
+                              AI核心诊断
+                            </h4>
+                            <div className="space-y-3">
+                              {/* 亮点标签 */}
+                              {displayHighlights.length > 0 && (
+                                <div>
+                                  <p className="text-xs font-medium text-gray-600 mb-2">表现亮点</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {displayHighlights.map((highlight, index) => (
+                                      <div key={index} className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-800 border border-green-200 rounded-lg">
+                                        <CheckCircle className="h-4 w-4 flex-shrink-0" />
+                                        <span className="text-sm font-medium truncate">
+                                          {highlight.title}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* 建议标签 */}
+                              {displaySuggestions.length > 0 && (
+                                <div>
+                                  <p className="text-xs font-medium text-gray-600 mb-2">改进建议</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {displaySuggestions.map((suggestion, index) => (
+                                      <div key={index} className={`flex items-center gap-2 px-3 py-2 border rounded-lg ${getSeverityStyle(suggestion.severity)}`}>
+                                        <span className="text-sm flex-shrink-0">{getSeverityIcon(suggestion.severity)}</span>
+                                        <span className="text-sm font-medium truncate">
+                                          {suggestion.title}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* 查看详情按钮 */}
+                          <Button 
+                            variant="outline" 
+                            className="border-purple-200 text-purple-700 hover:bg-purple-50 hover:border-purple-300 group-hover:bg-gradient-to-r group-hover:from-purple-600 group-hover:to-pink-600 group-hover:text-white group-hover:border-transparent transition-all duration-300"
+                            asChild
+                          >
+                            <Link href={`/practice-history/${session.id}`}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              查看详情
+                            </Link>
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
           )}
         </div>

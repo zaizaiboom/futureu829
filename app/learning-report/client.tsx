@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { User } from '@supabase/supabase-js'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { 
   BarChart3, 
@@ -17,18 +16,16 @@ import {
   Lightbulb,
   ChevronRight,
   Calendar,
-  Star
+  CheckCircle
 } from 'lucide-react'
+import { CurrentCompetencyStatus } from '@/components/current-competency-status'
+import { DevelopmentTrend } from '@/components/development-trend'
+import { mockCompetencyData } from '@/types/competency'
 import { format, subDays, startOfDay } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import Link from 'next/link'
 import Navigation from '@/components/navigation'
 import {
-  Radar,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
   ResponsiveContainer,
   LineChart,
   Line,
@@ -37,13 +34,18 @@ import {
   CartesianGrid,
   Tooltip
 } from 'recharts'
+import { 
+  QualitativeFeedback, 
+  QualitativeCompetencyData, 
+  CompetencyTagTrend,
+  CompetencyLevel,
+  generateMockQualitativeFeedback, 
+  qualitativeAnalytics,
+  generateQualitativeCompetencyData
+} from '@/lib/qualitative-analytics'
 
 interface PracticeSession {
   id: string
-  overall_score: number
-  content_score: number
-  logic_score: number
-  expression_score: number
   practice_duration: number
   created_at: string
   interview_questions: {
@@ -55,135 +57,146 @@ interface PracticeSession {
   question_categories: {
     category_name: string
   }
+  // 新增定性反馈数据
+  qualitative_feedback?: QualitativeFeedback
 }
 
-interface CompetencyData {
-  subject: string
-  score: number
-  fullMark: 100
-}
-
-interface ProgressData {
+interface TagTrendData {
   date: string
-  score: number
-  sessions: number
+  [tagName: string]: string | number // 动态标签名作为键，值为出现次数
 }
 
 interface WeeklyStats {
   thisWeek: {
     sessions: number
-    avgScore: number
+    totalHighlights: number
     totalDuration: number
   }
   lastWeek: {
     sessions: number
-    avgScore: number
+    totalHighlights: number
     totalDuration: number
   }
 }
 
 export function LearningReportClient({ sessions, user }: { sessions: PracticeSession[], user: User }) {
-  const [competencyData, setCompetencyData] = useState<CompetencyData[]>([])
-  const [progressData, setProgressData] = useState<ProgressData[]>([])
+  const [competencyData, setCompetencyData] = useState<QualitativeCompetencyData[]>([])
+  const [tagTrendData, setTagTrendData] = useState<TagTrendData[]>([])
   const [weeklyStats, setWeeklyStats] = useState<WeeklyStats>({
-    thisWeek: { sessions: 0, avgScore: 0, totalDuration: 0 },
-    lastWeek: { sessions: 0, avgScore: 0, totalDuration: 0 }
+    thisWeek: { sessions: 0, totalHighlights: 0, totalDuration: 0 },
+    lastWeek: { sessions: 0, totalHighlights: 0, totalDuration: 0 }
   })
-  const [aiInsights, setAiInsights] = useState<string>('')
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set())
+  const [hoveredTag, setHoveredTag] = useState<string | null>(null)
+
 
   useEffect(() => {
     if (sessions.length > 0) {
       processAnalyticsData()
-      generateAIInsights()
     }
   }, [sessions])
 
   const processAnalyticsData = () => {
-    // 处理能力雷达图数据
-    const avgContent = sessions.reduce((sum, s) => sum + s.content_score, 0) / sessions.length
-    const avgLogic = sessions.reduce((sum, s) => sum + s.logic_score, 0) / sessions.length
-    const avgExpression = sessions.reduce((sum, s) => sum + s.expression_score, 0) / sessions.length
-    const avgOverall = sessions.reduce((sum, s) => sum + s.overall_score, 0) / sessions.length
+    if (sessions.length === 0) return
 
-    setCompetencyData([
-      { subject: '内容质量', score: Math.round(avgContent), fullMark: 100 },
-      { subject: '逻辑思维', score: Math.round(avgLogic), fullMark: 100 },
-      { subject: '表达能力', score: Math.round(avgExpression), fullMark: 100 },
-      { subject: '综合表现', score: Math.round(avgOverall), fullMark: 100 }
-    ])
-
-    // 处理进步曲线数据
-    const last30Days = sessions
-      .filter(s => new Date(s.created_at) >= subDays(new Date(), 30))
-      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-
-    const dailyData = last30Days.reduce((acc, session) => {
-      const date = format(new Date(session.created_at), 'MM-dd')
-      if (!acc[date]) {
-        acc[date] = { sessions: 0, totalScore: 0 }
-      }
-      acc[date].sessions += 1
-      acc[date].totalScore += session.overall_score
-      return acc
-    }, {} as Record<string, { sessions: number, totalScore: number }>)
-
-    const progressArray = Object.entries(dailyData).map(([date, data]) => ({
-      date,
-      score: Math.round(data.totalScore / data.sessions),
-      sessions: data.sessions
-    }))
-
-    setProgressData(progressArray)
-
-    // 处理周统计数据
-    const now = new Date()
-    const thisWeekStart = startOfDay(subDays(now, 7))
-    const lastWeekStart = startOfDay(subDays(now, 14))
-
-    const thisWeekSessions = sessions.filter(s => new Date(s.created_at) >= thisWeekStart)
-    const lastWeekSessions = sessions.filter(s => 
-      new Date(s.created_at) >= lastWeekStart && new Date(s.created_at) < thisWeekStart
-    )
-
-    setWeeklyStats({
-      thisWeek: {
-        sessions: thisWeekSessions.length,
-        avgScore: thisWeekSessions.length > 0 
-          ? Math.round(thisWeekSessions.reduce((sum, s) => sum + s.overall_score, 0) / thisWeekSessions.length)
-          : 0,
-        totalDuration: thisWeekSessions.reduce((sum, s) => sum + s.practice_duration, 0)
-      },
-      lastWeek: {
-        sessions: lastWeekSessions.length,
-        avgScore: lastWeekSessions.length > 0
-          ? Math.round(lastWeekSessions.reduce((sum, s) => sum + s.overall_score, 0) / lastWeekSessions.length)
-          : 0,
-        totalDuration: lastWeekSessions.reduce((sum, s) => sum + s.practice_duration, 0)
+    // 生成模拟的定性反馈数据（实际应用中应从后端获取）
+    const allFeedbacks = sessions.map(session => {
+      const mockData = generateMockQualitativeFeedback(1)[0]
+      return {
+        ...mockData,
+        sessionId: session.id,
+        practiceDate: session.created_at.split('T')[0]
       }
     })
+
+    // 生成能力分析数据
+    const competencies = generateQualitativeCompetencyData(allFeedbacks)
+    setCompetencyData(competencies)
+
+    // 处理能力标签趋势数据
+    const trends = qualitativeAnalytics.getCompetencyTagTrends(allFeedbacks)
+    
+    // 按日期分组并统计标签出现次数
+    const trendsByDate: Record<string, Record<string, number>> = {}
+    const sessionsByDate: Record<string, number> = {}
+    
+    // 统计每日的标签出现次数和总练习次数
+    trends.forEach(trend => {
+      if (!trendsByDate[trend.date]) {
+        trendsByDate[trend.date] = {}
+        sessionsByDate[trend.date] = 0
+      }
+      const key = `${trend.tagType === 'highlight' ? '✅' : '⚠️'} ${trend.tagTitle}`
+      trendsByDate[trend.date][key] = (trendsByDate[trend.date][key] || 0) + 1
+    })
+    
+    // 统计每日练习次数
+    allFeedbacks.forEach(feedback => {
+      const date = feedback.practiceDate
+      sessionsByDate[date] = (sessionsByDate[date] || 0) + 1
+    })
+    
+    // 转换为图表数据格式，计算百分比（基于最近5次练习的滑动窗口）
+    const sortedDates = Object.keys(trendsByDate).sort()
+    const chartData = sortedDates.map((date, index) => {
+      const tags = trendsByDate[date]
+      const percentageTags: Record<string, number> = {}
+      
+      // 计算每个标签在最近5次练习中的出现率
+      Object.keys(tags).forEach(tagKey => {
+        const recentDates = sortedDates.slice(Math.max(0, index - 4), index + 1) // 最近5次
+        let totalAppearances = 0
+        let totalSessions = 0
+        
+        recentDates.forEach(recentDate => {
+          totalAppearances += trendsByDate[recentDate]?.[tagKey] || 0
+          totalSessions += sessionsByDate[recentDate] || 0
+        })
+        
+        percentageTags[tagKey] = totalSessions > 0 ? Math.round((totalAppearances / totalSessions) * 100) : 0
+      })
+      
+      return {
+        date: format(new Date(date), 'MM/dd'),
+        ...percentageTags
+      }
+    }).slice(-30) // 最近30天
+    
+    setTagTrendData(chartData)
+
+    // 计算周统计
+    const now = new Date()
+    const thisWeekStart = subDays(now, 7)
+    const lastWeekStart = subDays(now, 14)
+    
+    const thisWeekSessions = sessions.filter(s => new Date(s.created_at) >= thisWeekStart)
+    const lastWeekSessions = sessions.filter(s => {
+      const date = new Date(s.created_at)
+      return date >= lastWeekStart && date < thisWeekStart
+    })
+    
+    const thisWeekFeedbacks = allFeedbacks.filter(f => new Date(f.practiceDate) >= thisWeekStart)
+    const lastWeekFeedbacks = allFeedbacks.filter(f => {
+      const date = new Date(f.practiceDate)
+      return date >= lastWeekStart && date < thisWeekStart
+    })
+    
+    const thisWeekStats = {
+      sessions: thisWeekSessions.length,
+      totalHighlights: qualitativeAnalytics.getTotalHighlights(thisWeekFeedbacks),
+      totalDuration: thisWeekSessions.reduce((sum, s) => sum + s.practice_duration, 0)
+    }
+    
+    const lastWeekStats = {
+      sessions: lastWeekSessions.length,
+      totalHighlights: qualitativeAnalytics.getTotalHighlights(lastWeekFeedbacks),
+      totalDuration: lastWeekSessions.reduce((sum, s) => sum + s.practice_duration, 0)
+    }
+    
+    setWeeklyStats({ thisWeek: thisWeekStats, lastWeek: lastWeekStats })
   }
 
-  const generateAIInsights = () => {
-    if (sessions.length === 0) {
-      setAiInsights('开始练习后，AI将为您提供个性化的学习建议。')
-      return
-    }
 
-    const avgScore = sessions.reduce((sum, s) => sum + s.overall_score, 0) / sessions.length
-    const recentSessions = sessions.slice(0, 5)
-    const recentAvg = recentSessions.reduce((sum, s) => sum + s.overall_score, 0) / recentSessions.length
-
-    let insights = ''
-    if (recentAvg > avgScore + 5) {
-      insights = '🎉 您最近的表现有显著提升！继续保持这种学习节奏。'
-    } else if (recentAvg < avgScore - 5) {
-      insights = '💪 建议加强练习，特别关注逻辑思维和表达能力的提升。'
-    } else {
-      insights = '📈 您的表现保持稳定，可以尝试挑战更高难度的题目。'
-    }
-
-    setAiInsights(insights)
-  }
 
   const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600)
@@ -250,12 +263,12 @@ export function LearningReportClient({ sessions, user }: { sessions: PracticeSes
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-600">平均分数</p>
+                        <p className="text-sm font-medium text-gray-600">累计获得亮点</p>
                         <p className="text-2xl font-bold text-gray-900">
-                          {Math.round(sessions.reduce((sum, s) => sum + s.overall_score, 0) / sessions.length)}
+                          {weeklyStats.thisWeek.totalHighlights}
                         </p>
                       </div>
-                      <Star className="h-8 w-8 text-yellow-600" />
+                      <CheckCircle className="h-8 w-8 text-green-600" />
                     </div>
                   </CardContent>
                 </Card>
@@ -291,98 +304,87 @@ export function LearningReportClient({ sessions, user }: { sessions: PracticeSes
               </div>
             </div>
 
-            {/* 能力雷达图 */}
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Brain className="h-5 w-5" />
-                  <span>能力分析</span>
-                </CardTitle>
-                <CardDescription>各项能力的综合评估</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart data={competencyData}>
-                      <PolarGrid />
-                      <PolarAngleAxis dataKey="subject" />
-                      <PolarRadiusAxis angle={90} domain={[0, 100]} />
-                      <Radar
-                        name="能力分数"
-                        dataKey="score"
-                        stroke="#8b5cf6"
-                        fill="#8b5cf6"
-                        fillOpacity={0.3}
-                        strokeWidth={2}
-                      />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
+            {/* 能力光谱分析 */}
+             <div className="lg:col-span-2">
+               <CurrentCompetencyStatus competencyData={mockCompetencyData} />
+             </div>
 
-            {/* AI智能建议 */}
+            {/* AI综合成长建议 */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Lightbulb className="h-5 w-5" />
-                  <span>AI建议</span>
+                  <span>AI综合成长建议</span>
                 </CardTitle>
+                <CardDescription>基于历史练习数据的个性化成长指导</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-700">{aiInsights}</p>
-                </div>
-                <div className="mt-4 space-y-2">
-                  <Link href="/interview-practice" className="group">
-                    <div className="p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-100 hover:border-purple-200 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h5 className="font-medium text-purple-900">继续练习</h5>
-                          <p className="text-sm text-purple-600">提升面试技能</p>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-purple-600 group-hover:translate-x-1 transition-transform" />
+                <div className="space-y-4">
+                  {/* 动态生成的成长建议 */}
+                  <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-blue-600 font-semibold text-sm">1</span>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium text-blue-900 mb-2">核心提升方向</h4>
+                        <p className="text-sm text-blue-800 leading-relaxed mb-3">
+                          {(() => {
+                            // 生成模拟反馈数据用于分析
+                            const mockFeedbacks = generateMockQualitativeFeedback(sessions.length || 5)
+                            return qualitativeAnalytics.generateGrowthAdvice(mockFeedbacks)
+                          })()}
+                        </p>
+
                       </div>
                     </div>
-                  </Link>
+                  </div>
+                  
+                  {/* 最频繁的建议 */}
+                  <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-200">
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
+                        <span className="text-amber-600 font-semibold text-sm">2</span>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium text-amber-900 mb-2">重点关注领域</h4>
+                        <p className="text-sm text-amber-800 leading-relaxed mb-3">
+                          {(() => {
+                            const mockFeedbacks = generateMockQualitativeFeedback(sessions.length || 5)
+                            const mostFrequent = qualitativeAnalytics.getMostFrequentSuggestion(mockFeedbacks)
+                            return `根据分析，"${mostFrequent}"是您需要重点关注的能力领域。建议在接下来的练习中特别注意这个方面的提升。`
+                          })()}
+                        </p>
+
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* 积极反馈 */}
+                  <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                        <span className="text-green-600 font-semibold text-sm">3</span>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium text-green-900 mb-2">保持优势</h4>
+                        <p className="text-sm text-green-800 leading-relaxed mb-3">
+                          您在多次练习中展现出了稳定的表现，继续保持当前的学习节奏和方法。建议定期回顾练习记录，巩固已掌握的技能。
+                        </p>
+
+                      </div>
+                    </div>
+                  </div>
+                  
+
                 </div>
               </CardContent>
             </Card>
 
-            {/* 进步曲线 */}
-            <Card className="lg:col-span-3">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <BarChart3 className="h-5 w-5" />
-                  <span>进步曲线</span>
-                </CardTitle>
-                <CardDescription>最近30天的表现趋势</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={progressData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis domain={[0, 100]} />
-                      <Tooltip 
-                        formatter={(value, name) => [
-                          name === 'score' ? `${value}分` : `${value}次`,
-                          name === 'score' ? '平均分数' : '练习次数'
-                        ]}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="score" 
-                        stroke="#8b5cf6" 
-                        strokeWidth={3}
-                        dot={{ fill: '#8b5cf6', strokeWidth: 2, r: 4 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
+            {/* 能力发展趋势 */}
+             <div className="lg:col-span-3">
+               <DevelopmentTrend competencyData={mockCompetencyData} />
+             </div>
           </div>
         )}
       </div>

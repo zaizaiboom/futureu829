@@ -9,7 +9,7 @@ import InterviewPractice from "./interview-practice"
 import AuthModal from "./auth-modal"
 import UserMenu from "./user-menu"
 import { signIn, signUp, signOut, resetPassword } from "./lib/auth-actions"
-import { createClient } from "./lib/supabase/client"
+import { supabase } from '@/lib/supabase/client'
 
 interface User {
   id: string
@@ -25,7 +25,7 @@ export default function LandingPage() {
 
   useEffect(() => {
     setIsLoading(true);
-    const supabase = createClient();
+    
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {

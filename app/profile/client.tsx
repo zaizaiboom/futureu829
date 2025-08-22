@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { supabase } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -77,7 +77,7 @@ export function ProfileClient({ user, profileData, domainsData, skillsData }: Pr
   const [newDomain, setNewDomain] = useState('')
   const [newSkill, setNewSkill] = useState('')
   
-  const supabase = createClientComponentClient()
+  
 
   useEffect(() => {
     // 如果没有profile数据，创建默认profile
@@ -132,7 +132,7 @@ export function ProfileClient({ user, profileData, domainsData, skillsData }: Pr
 
     try {
       const { data, error } = await supabase
-        .from('user_domains')
+        .from('user_target_domains')
         .insert({ user_id: user.id, domain_name: newDomain })
         .select()
         .single()
@@ -152,7 +152,7 @@ export function ProfileClient({ user, profileData, domainsData, skillsData }: Pr
   const removeDomain = async (domainId: number) => {
     try {
       const { error } = await supabase
-        .from('user_domains')
+        .from('user_target_domains')
         .delete()
         .eq('id', domainId)
 

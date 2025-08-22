@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { supabase } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -52,7 +52,7 @@ export function SettingsClient({ user }: SettingsClientProps) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   
-  const supabase = createClientComponentClient()
+  
   const router = useRouter()
 
   useEffect(() => {

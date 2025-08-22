@@ -175,7 +175,7 @@ ${questions
     console.log("🚀 [API] 开始调用AI服务，API Key存在:", !!apiKey)
 
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30秒超时
+    const timeoutId = setTimeout(() => controller.abort(), 45000) // 30秒超时
 
     const aiResponse = await fetch("https://api.siliconflow.cn/v1/chat/completions", {
       method: "POST",

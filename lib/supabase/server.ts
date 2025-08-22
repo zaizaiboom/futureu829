@@ -4,6 +4,9 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { cache } from 'react'
 
+// 检查 Supabase 是否已配置
+export const isSupabaseConfigured = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+
 export const createClient = cache(async () => {
   const cookieStore = await cookies()
 

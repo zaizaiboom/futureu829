@@ -183,17 +183,24 @@ ${data.keyPoints
 
   // 生成备用评估结果（当AI服务不可用时）
   generateFallbackEvaluation(data: EvaluationRequest): EvaluationResponse {
-    const baseScore = Math.floor(Math.random() * 20) + 70 // 70-90分
+    const baseScore = Math.floor(Math.random() * 30) + 60 // 60-89分，更广泛的分数范围
 
     return {
       score: baseScore,
       strengths: ["回答结构相对清晰，有一定的逻辑性", "对问题有基本的理解和思考", "表达较为流畅，语言组织能力良好"],
       improvements: ["建议结合更多具体案例来支撑观点", "可以进一步深入分析问题的本质", "表达可以更加精炼和专业"],
-      coverageAnalysis: data.keyPoints.map((point) => ({
-        point,
-        covered: Math.random() > 0.3,
-        score: Math.floor(Math.random() * 20) + 75,
-      })),
+      coverageAnalysis: data.keyPoints.map((point) => {
+        const covered = Math.random() > 0.3;
+        // 根据是否覆盖关键点来生成更合理的分数
+        const pointScore = covered 
+          ? Math.floor(Math.random() * 25) + 65  // 覆盖的关键点：65-89分
+          : Math.floor(Math.random() * 40) + 30; // 未覆盖的关键点：30-69分
+        return {
+          point,
+          covered,
+          score: pointScore,
+        };
+      }),
       detailedScore: {
         content: Math.floor(baseScore * 0.4),
         logic: Math.floor(baseScore * 0.3),

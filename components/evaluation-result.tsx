@@ -54,11 +54,10 @@ export function EvaluationResult({ result }: EvaluationResultProps) {
 
   return (
     <div className="space-y-6">
-      {/* Overall Score */}
+      {/* Overall Assessment */}
       <Card>
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">综合评估结果</CardTitle>
-          <div className={`text-4xl font-bold ${getScoreColor(result.overallScore)}`}>{result.overallScore}分</div>
+          <CardTitle className="text-2xl">能力分析报告</CardTitle>
           <Badge variant="outline" className="text-lg px-4 py-1">
             {result.rating}
           </Badge>
@@ -92,7 +91,7 @@ export function EvaluationResult({ result }: EvaluationResultProps) {
         </Card>
       </div>
 
-      {/* Detailed Scores */}
+      {/* Detailed Analysis */}
       <Tabs defaultValue="templates" className="w-full">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="templates">📝 答题模板</TabsTrigger>

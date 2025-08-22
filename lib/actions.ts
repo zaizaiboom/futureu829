@@ -29,16 +29,21 @@ export async function signIn(prevState: any, formData: FormData) {
 
   const supabase = createSupabaseClient(supabaseUrl, supabaseKey, {
     cookies: {
-      getAll() {
-        return cookieStore.getAll()
+      get(name: string) {
+        return cookieStore.get(name)?.value
       },
-      setAll(cookiesToSet) {
+      set(name: string, value: string, options: any) {
         try {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options)
-          })
+          cookieStore.set({ name, value, ...options })
         } catch (error) {
           // Ignore cookie setting errors in server actions
+        }
+      },
+      remove(name: string, options: any) {
+        try {
+          cookieStore.set({ name, value: '', ...options })
+        } catch (error) {
+          // Ignore cookie removal errors in server actions
         }
       },
     },
@@ -103,16 +108,21 @@ export async function signUp(prevState: any, formData: FormData) {
 
   const supabase = createSupabaseClient(supabaseUrl, supabaseKey, {
     cookies: {
-      getAll() {
-        return cookieStore.getAll()
+      get(name: string) {
+        return cookieStore.get(name)?.value
       },
-      setAll(cookiesToSet) {
+      set(name: string, value: string, options: any) {
         try {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options)
-          })
+          cookieStore.set({ name, value, ...options })
         } catch (error) {
           // Ignore cookie setting errors in server actions
+        }
+      },
+      remove(name: string, options: any) {
+        try {
+          cookieStore.set({ name, value: '', ...options })
+        } catch (error) {
+          // Ignore cookie removal errors in server actions
         }
       },
     },
@@ -230,16 +240,21 @@ export async function signOut() {
 
   const supabase = createSupabaseClient(supabaseUrl, supabaseKey, {
     cookies: {
-      getAll() {
-        return cookieStore.getAll()
+      get(name: string) {
+        return cookieStore.get(name)?.value
       },
-      setAll(cookiesToSet) {
+      set(name: string, value: string, options: any) {
         try {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options)
-          })
+          cookieStore.set({ name, value, ...options })
         } catch (error) {
           // Ignore cookie setting errors in server actions
+        }
+      },
+      remove(name: string, options: any) {
+        try {
+          cookieStore.set({ name, value: '', ...options })
+        } catch (error) {
+          // Ignore cookie removal errors in server actions
         }
       },
     },

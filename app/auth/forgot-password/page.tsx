@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { supabase } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -18,7 +18,7 @@ export default function ForgotPasswordPage() {
   const [success, setSuccess] = useState(false)
   
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault()

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { supabase } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -24,7 +24,7 @@ interface NavigationProps {
 export default function Navigation({ currentPage }: NavigationProps) {
   const [user, setUser] = useState<User | null>(null)
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  
 
   useEffect(() => {
     const getUser = async () => {
