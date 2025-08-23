@@ -375,3 +375,8 @@ export const generateMockQualitativeFeedback = (count: number): QualitativeFeedb
 
 // 导出标签多样性管理器，供其他模块使用
 export { TagDiversityManager, tagDiversityManager };
+
+// 从反馈中提取下一步行动计划
+export const getHistoryFeedbackNextSteps = (feedback: QualitativeFeedback): ActionItem[] => {
+  return feedback.actionPlan || [];
+};

@@ -31,10 +31,14 @@ export async function GET(request: Request) {
       const count = parseInt(searchParams.get('count') || '5')
       let query = supabase.from('interview_questions').select('*').eq('stage_id', stageId)
       if (categoryId) query = query.eq('category_id', categoryId)
-      const { data, error } = await query.limit(count * 2)
+      const { data, error } = await query
       if (error) return NextResponse.json({ questions: [] })
-      const shuffled = (data || []).sort(() => 0.5 - Math.random())
-      return NextResponse.json({ questions: shuffled.slice(0, count) })
+      let questions = data || [];
+      for (let i = questions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [questions[i], questions[j]] = [questions[j], questions[i]];
+      }
+      return NextResponse.json({ questions: questions.slice(0, count) })
     }
 
     if (action === 'randomByCategory') {
@@ -42,8 +46,12 @@ export async function GET(request: Request) {
       const count = parseInt(searchParams.get('count') || '2')
       const { data, error } = await supabase.from('interview_questions').select('*').eq('category_id', categoryId)
       if (error) return NextResponse.json({ questions: [] })
-      const shuffled = (data || []).sort(() => 0.5 - Math.random())
-      return NextResponse.json({ questions: shuffled.slice(0, Math.min(count, data.length)) })
+      let questions = data || [];
+      for (let i = questions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [questions[i], questions[j]] = [questions[j], questions[i]];
+      }
+      return NextResponse.json({ questions: questions.slice(0, Math.min(count, questions.length)) })
     }
 
     if (action === 'questionsByStage') {

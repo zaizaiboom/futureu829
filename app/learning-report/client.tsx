@@ -88,11 +88,19 @@ export function LearningReportClient({ sessions, user }: { sessions: PracticeSes
   })
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set())
   const [hoveredTag, setHoveredTag] = useState<string | null>(null)
+  const [growthAdvice, setGrowthAdvice] = useState<string>('')
+  const [mostFrequentSuggestion, setMostFrequentSuggestion] = useState<string>('')
 
 
   useEffect(() => {
     if (sessions.length > 0) {
       processAnalyticsData()
+      const mockFeedbacksForAdvice = generateMockQualitativeFeedback(sessions.length || 5);
+      const advice = qualitativeAnalytics.generateGrowthAdvice(mockFeedbacksForAdvice);
+      setGrowthAdvice(advice);
+
+      const frequentSuggestion = qualitativeAnalytics.getMostFrequentSuggestion(mockFeedbacksForAdvice);
+      setMostFrequentSuggestion(`根据分析，"${frequentSuggestion}"是您需要重点关注的能力领域。建议在接下来的练习中特别注意这个方面的提升。`);
     }
   }, [sessions])
 
@@ -329,11 +337,7 @@ export function LearningReportClient({ sessions, user }: { sessions: PracticeSes
                       <div className="flex-1">
                         <h4 className="font-medium text-blue-900 mb-2">核心提升方向</h4>
                         <p className="text-sm text-blue-800 leading-relaxed mb-3">
-                          {(() => {
-                            // 生成模拟反馈数据用于分析
-                            const mockFeedbacks = generateMockQualitativeFeedback(sessions.length || 5)
-                            return qualitativeAnalytics.generateGrowthAdvice(mockFeedbacks)
-                          })()}
+                          {growthAdvice}
                         </p>
 
                       </div>
@@ -349,11 +353,7 @@ export function LearningReportClient({ sessions, user }: { sessions: PracticeSes
                       <div className="flex-1">
                         <h4 className="font-medium text-amber-900 mb-2">重点关注领域</h4>
                         <p className="text-sm text-amber-800 leading-relaxed mb-3">
-                          {(() => {
-                            const mockFeedbacks = generateMockQualitativeFeedback(sessions.length || 5)
-                            const mostFrequent = qualitativeAnalytics.getMostFrequentSuggestion(mockFeedbacks)
-                            return `根据分析，"${mostFrequent}"是您需要重点关注的能力领域。建议在接下来的练习中特别注意这个方面的提升。`
-                          })()}
+                          {mostFrequentSuggestion}
                         </p>
 
                       </div>

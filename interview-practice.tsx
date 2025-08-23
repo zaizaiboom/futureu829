@@ -32,6 +32,8 @@ import {
 } from "lucide-react"
 import { getRandomQuestions, getQuestionCount, type Question, getQuestionStats } from "@/lib/questions-service"
 import { QuickTips } from "@/components/quick-tips"
+import type { AggregatedReport, IndividualEvaluationResponse } from "@/types/evaluation"
+import { getHistoryFeedbackNextSteps } from './lib/qualitative-analytics';
 
 // TypeScript类型定义
 declare global {
@@ -106,34 +108,46 @@ interface InterviewPracticeProps {
   onBack: () => void
 }
 
-interface QualitativeEvaluationResponse {
-  performanceLevel: "优秀表现" | "良好表现" | "有待提升"
-  summary: string
-  strengths: Array<{
-    area: string
-    description: string
-  }>
-  improvements: Array<{
-    area: string
-    suggestion: string
-    example: string
-  }>
-  nextSteps: Array<{
-    focus: string
-    actionable: string
-  }>
-  encouragement?: string
-}
+type EvaluationResult = AggregatedReport;
 
 export default function InterviewPractice({ moduleType = "hr", onBack }: InterviewPracticeProps) {
+  // 类型检查函数
+  const isAggregatedReport = (data: any): data is AggregatedReport => {
+    return 'individualEvaluations' in data && 'overallSummary' in data;
+  }
+
+  // 检查是否为旧版评估格式
+  const isLegacyEvaluation = (data: any): boolean => {
+    return data && 'encouragement' in data;
+  }
+
+  // 获取历史反馈的等级
+  const getHistoryFeedbackLevel = (feedback: EvaluationResult): string => {
+    return feedback.overallSummary.overallLevel || '良好表现';
+  }
+
+  // 获取历史反馈的总结
+  const getHistoryFeedbackSummary = (feedback: EvaluationResult): string => {
+    return feedback.overallSummary.summary || '暂无评估总结';
+  }
+
+  // 获取历史反馈的优势
+  const getHistoryFeedbackStrengths = (feedback: EvaluationResult) => {
+    return feedback.overallSummary.strengths || [];
+  }
+
+  // 获取历史反馈的改进建议
+  const getHistoryFeedbackImprovements = (feedback: EvaluationResult) => {
+    return feedback.overallSummary.improvements || [];
+  }
   // 状态管理
   const [currentStep, setCurrentStep] = useState<"overview" | "answering" | "analyzing" | "result">("overview")
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [answers, setAnswers] = useState<string[]>([])
   const [currentAnswer, setCurrentAnswer] = useState("")
   const [timeLeft, setTimeLeft] = useState(0)
-  const [feedback, setFeedback] = useState<QualitativeEvaluationResponse | null>(null)
-  const [history, setHistory] = useState<QualitativeEvaluationResponse[]>([])
+  const [feedback, setFeedback] = useState<EvaluationResult | null>(null)
+  const [history, setHistory] = useState<EvaluationResult[]>([])
   const [evaluationError, setEvaluationError] = useState<string | null>(null)
   const [stageProgress, setStageProgress] = useState(0)
   const [isEvaluating, setIsEvaluating] = useState(false)
@@ -472,8 +486,16 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
   }
 
   // 保存练习记录到数据库
-  const savePracticeSession = async (evaluationResult: QualitativeEvaluationResponse, answers: string[]) => {
+  const savePracticeSession = async (evaluationResult: AggregatedReport, answers: string[]) => {
     try {
+      const levelScoreMap: { [key: string]: number } = {
+        "优秀表现": 90,
+        "良好表现": 75,
+        "有待提高": 60,
+        "初学乍练": 45,
+        "无法评估": 0,
+      };
+
       const practiceData = {
         stage_type: moduleType,
         questions_and_answers: questions.map((question, index) => ({
@@ -481,14 +503,12 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
           answer: answers[index] || '',
           question_id: question.id
         })),
-        evaluation_score: evaluationResult.performanceLevel === '优秀表现' ? 90 : 
-                         evaluationResult.performanceLevel === '良好表现' ? 75 : 60,
+        evaluation_score: levelScoreMap[evaluationResult.overallSummary.overallLevel] ?? 60,
         ai_feedback: {
-          summary: evaluationResult.summary,
-          strengths: evaluationResult.strengths,
-          improvements: evaluationResult.improvements,
-          nextSteps: evaluationResult.nextSteps,
-          encouragement: evaluationResult.encouragement
+          summary: evaluationResult.overallSummary.summary,
+          strengths: evaluationResult.overallSummary.strengths,
+          improvements: evaluationResult.overallSummary.improvements,
+          // nextSteps and encouragement are not in the new model, so we remove them
         }
       }
 
@@ -511,7 +531,7 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
       console.log("✅ [前端] 练习记录保存成功:", result)
     } catch (error) {
       console.error("💥 [前端] 保存练习记录失败:", error)
-      throw error
+      // Do not re-throw, as this is a non-critical background task
     }
   }
 
@@ -561,20 +581,25 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
         throw new Error(responseData.message || responseData.error || "评估服务暂时不可用")
       }
 
-      if (responseData.performanceLevel) {
-        const evaluationResult: QualitativeEvaluationResponse = responseData
-        setFeedback(evaluationResult)
+      if (isAggregatedReport(responseData)) {
+        const aggregatedReport: AggregatedReport = responseData
+        setFeedback(aggregatedReport)
         setCurrentStep("result")
-        const newHistory = [...history, evaluationResult]
+        const newHistory = [...history, aggregatedReport]
         setHistory(newHistory)
         localStorage.setItem(`interviewHistory_${moduleType}`, JSON.stringify(newHistory))
         
-        // 保存练习记录到数据库
-        await savePracticeSession(evaluationResult, allAnswers)
+        // 保存练习记录到数据库 (fire and forget)
+        savePracticeSession(aggregatedReport, allAnswers)
         
-        console.log("✅ [前端] 评估完成:", evaluationResult.performanceLevel)
+        console.log("✅ [前端] 新版评估完成:", {
+          evaluationId: aggregatedReport.evaluationId,
+          overallLevel: aggregatedReport.overallSummary.overallLevel,
+          individualCount: aggregatedReport.individualEvaluations.length
+        })
       } else {
-        throw new Error("评估结果格式错误")
+        console.error("评估结果格式错误", responseData);
+        throw new Error("收到的评估结果格式不正确。")
       }
     } catch (error) {
       clearInterval(progressInterval)
@@ -589,11 +614,7 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
       localStorage.setItem(`interviewHistory_${moduleType}`, JSON.stringify(newHistory))
       
       // 保存备用评估结果到数据库
-      try {
-        await savePracticeSession(fallbackResult, allAnswers)
-      } catch (saveError) {
-        console.error("💥 [前端] 保存练习记录失败:", saveError)
-      }
+      savePracticeSession(fallbackResult, allAnswers)
       
       console.log("🔄 [前端] 使用备用评估结果")
     } finally {
@@ -602,34 +623,44 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
   }
 
   // 生成备用评估结果
-  const generateFallbackEvaluation = (): QualitativeEvaluationResponse => {
+  const generateFallbackEvaluation = (): AggregatedReport => {
     return {
-      performanceLevel: "良好表现",
-      summary: "你的回答展现了良好的基础素养和学习态度，在表达逻辑和专业认知方面有不错的表现。",
-      strengths: [
-        {
-          area: "表达逻辑",
-          description: "回答结构清晰，能够按照逻辑顺序组织内容，体现了良好的沟通基础。",
-        },
-        {
-          area: "学习态度",
-          description: "对AI产品经理角色有基本认知，展现出学习和成长的积极态度。",
-        },
-      ],
-      improvements: [
-        {
-          area: "深化理解",
-          suggestion: "建议进一步深化对AI产品经理角色的理解，特别是技术与商业的结合。",
-          example: "可以通过分析具体的AI产品案例来提升认知深度。",
-        },
-      ],
-      nextSteps: [
-        {
-          focus: "实践经验",
-          actionable: "建议参与更多AI产品相关的实践项目，积累实战经验。",
-        },
-      ],
-      encouragement: "继续保持学习热情，相信通过不断实践和思考，你会成为优秀的AI产品经理！",
+      evaluationId: `fallback-${Date.now()}`,
+      overallSummary: {
+        overallLevel: "良好表现",
+        summary: "你的回答展现了良好的基础素养和学习态度，在表达逻辑和专业认知方面有不错的表现。",
+        strengths: [
+          {
+            competency: "表达逻辑",
+            description: "回答结构清晰，能够按照逻辑顺序组织内容，体现了良好的沟通基础。",
+          },
+          {
+            competency: "学习态度",
+            description: "对AI产品经理角色有基本认知，展现出学习和成长的积极态度。",
+          },
+        ],
+        improvements: [
+          {
+            competency: "深化理解",
+            suggestion: "建议进一步深化对AI产品经理角色的理解，特别是技术与商业的结合。",
+            example: "可以通过分析具体的AI产品案例来提升认知深度。",
+          },
+        ],
+      },
+      individualEvaluations: questions.map((q, i) => ({
+        question: q.question_text,
+        answer: answers[i] || "(未回答)",
+        evaluation: {
+          preliminaryAnalysis: {
+            isValid: true,
+            feedback: "这是一个备用的评估结果。"
+          },
+          performanceLevel: "良好表现",
+          strengths: [],
+          improvements: [],
+          followUpQuestion: "请尝试重新回答这个问题。"
+        }
+      }))
     }
   }
 
@@ -1296,11 +1327,16 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
                   {/* 总体表现 */}
                   <div>
                     <div className="flex items-center gap-2 mb-2">
-                      <Badge variant={feedback.performanceLevel === "优秀表现" ? "default" : "secondary"}>
-                        {feedback.performanceLevel}
+                      <Badge variant={getHistoryFeedbackLevel(feedback) === "优秀表现" ? "default" : "secondary"}>
+                        {getHistoryFeedbackLevel(feedback)}
                       </Badge>
+                      {isAggregatedReport(feedback) && (
+                        <Badge variant="outline" className="text-xs">
+                          {feedback.questionCount}题套题
+                        </Badge>
+                      )}
                     </div>
-                    <p className="text-gray-700">{feedback.summary}</p>
+                    <p className="text-gray-700">{getHistoryFeedbackSummary(feedback)}</p>
                   </div>
 
                   {/* 优势 */}
@@ -1310,7 +1346,7 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
                       表现亮点
                     </h3>
                     <div className="space-y-3">
-                      {feedback.strengths.map((strength, index) => (
+                      {getHistoryFeedbackStrengths(feedback).map((strength, index) => (
                         <div key={index} className="bg-green-50 p-4 rounded-lg">
                           <h4 className="font-medium text-green-800">{strength.area}</h4>
                           <p className="text-green-700 text-sm mt-1">{strength.description}</p>
@@ -1326,34 +1362,38 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
                       提升建议
                     </h3>
                     <div className="space-y-3">
-                      {feedback.improvements.map((improvement, index) => (
+                      {getHistoryFeedbackImprovements(feedback).map((improvement, index) => (
                         <div key={index} className="bg-orange-50 p-4 rounded-lg">
                           <h4 className="font-medium text-orange-800">{improvement.area}</h4>
                           <p className="text-orange-700 text-sm mt-1">{improvement.suggestion}</p>
-                          <p className="text-orange-600 text-xs mt-2 italic">{improvement.example}</p>
+                          {improvement.example && (
+                            <p className="text-orange-600 text-xs mt-2 italic">{improvement.example}</p>
+                          )}
                         </div>
                       ))}
                     </div>
                   </div>
 
                   {/* 下一步行动 */}
-                  <div>
-                    <h3 className="font-semibold mb-3 flex items-center gap-2">
-                      <Target className="h-4 w-4 text-blue-600" />
-                      行动计划
-                    </h3>
-                    <div className="space-y-3">
-                      {feedback.nextSteps.map((step, index) => (
-                        <div key={index} className="bg-blue-50 p-4 rounded-lg">
-                          <h4 className="font-medium text-blue-800">{step.focus}</h4>
-                          <p className="text-blue-700 text-sm mt-1">{step.actionable}</p>
-                        </div>
-                      ))}
+                  {getHistoryFeedbackNextSteps(feedback).length > 0 && (
+                    <div>
+                      <h3 className="font-semibold mb-3 flex items-center gap-2">
+                        <Target className="h-4 w-4 text-blue-600" />
+                        行动计划
+                      </h3>
+                      <div className="space-y-3">
+                        {getHistoryFeedbackNextSteps(feedback).map((step, index) => (
+                          <div key={index} className="bg-blue-50 p-4 rounded-lg">
+                            <h4 className="font-medium text-blue-800">{step.action}</h4>
+                            <p className="text-blue-700 text-sm mt-1">{step.description}</p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* 鼓励话语 */}
-                  {feedback.encouragement && (
+                  {isLegacyEvaluation(feedback) && feedback.encouragement && (
                     <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg">
                       <p className="text-purple-700 italic">{feedback.encouragement}</p>
                     </div>

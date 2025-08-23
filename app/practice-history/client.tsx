@@ -69,6 +69,29 @@ export function PracticeHistoryClient({ user, sessions, stages, categories }: Pr
     dateRange: 'all',
     sortBy: 'created_at_desc'
   })
+  
+  const [qualitativeFeedbacks, setQualitativeFeedbacks] = useState<Map<string, QualitativeFeedback>>(new Map())
+  const [coreImprovementArea, setCoreImprovementArea] = useState<string>('暂无数据')
+
+  useEffect(() => {
+    // 在客户端渲染后生成定性反馈数据
+    const feedbackMap = new Map<string, QualitativeFeedback>()
+    sessions.forEach(session => {
+      const mockData = generateMockQualitativeFeedback(1)[0]
+      feedbackMap.set(session.id, {
+        ...mockData,
+        sessionId: session.id
+      })
+    })
+    setQualitativeFeedbacks(feedbackMap)
+    
+    // 计算核心提升点
+    if (sessions.length > 0) {
+      const allFeedbacks = Array.from(feedbackMap.values())
+      const improvement = qualitativeAnalytics.getMostFrequentSuggestion(allFeedbacks)
+      setCoreImprovementArea(improvement)
+    }
+  }, [sessions])
 
   useEffect(() => {
     applyFilters()
@@ -126,19 +149,14 @@ export function PracticeHistoryClient({ user, sessions, stages, categories }: Pr
     return colors[(stageId - 1) % colors.length] || 'bg-gray-100 text-gray-800'
   }
 
-  // 生成模拟的定性反馈数据（实际应用中应从后端获取）
-  const getQualitativeFeedback = (sessionId: string): QualitativeFeedback => {
-    const mockData = generateMockQualitativeFeedback(1)[0]
-    return {
-      ...mockData,
-      sessionId
-    }
+  // 获取模拟的定性反馈数据（实际应用中应从后端获取）
+  const getQualitativeFeedback = (sessionId: string): QualitativeFeedback | undefined => {
+    return qualitativeFeedbacks.get(sessionId)
   }
 
   // 获取核心提升点
   const getCoreImprovementArea = () => {
-    const allFeedbacks = sessions.map(session => getQualitativeFeedback(session.id))
-    return qualitativeAnalytics.getMostFrequentSuggestion(allFeedbacks)
+    return coreImprovementArea
   }
 
   const calculateStats = () => {
@@ -291,6 +309,9 @@ export function PracticeHistoryClient({ user, sessions, stages, categories }: Pr
             <div className="space-y-4">
               {filteredSessions.map((session) => {
                 const feedback = getQualitativeFeedback(session.id)
+                // 如果反馈数据还未加载，跳过渲染
+                if (!feedback) return null
+                
                 // 获取最多2个亮点和2个建议
                 const displayHighlights = feedback.highlights.slice(0, 2)
                 const displaySuggestions = feedback.suggestions.slice(0, 2)
