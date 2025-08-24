@@ -1,14 +1,17 @@
 "use client"
 
-import InterviewPractice from "../../interview-practice.tsx"
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Target, Brain, TrendingUp, ArrowLeft } from "lucide-react"
+import InterviewPractice from "../../interview-practice.tsx"
 
-export default function InterviewPracticePage() {
+// 强制动态渲染
+export const dynamic = 'force-dynamic'
+
+function InterviewPracticeContent() {
   const [moduleType, setModuleType] = useState("hr")
   const [showFocusMode, setShowFocusMode] = useState(false)
   const [focusType, setFocusType] = useState<string | null>(null)
@@ -165,5 +168,22 @@ export default function InterviewPracticePage() {
       moduleType={moduleType} 
       onBack={handleBack} 
     />
+  )
+}
+
+export default function InterviewPracticePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <Card className="w-96">
+          <CardContent className="p-8 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">正在加载面试练习...</p>
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <InterviewPracticeContent />
+    </Suspense>
   )
 }

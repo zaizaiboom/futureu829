@@ -292,48 +292,6 @@ function detectLowQualityAnswer(userAnswer: string, question: string): PenaltyRe
 
 export async function POST(request: NextRequest) {
   try {
-    const data = await request.json()
-    const { question, userAnswer, stage = "professional" } = data
-
-    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
-
-    // 查询问题分析和回答框架
-    let questionAnalysis = '本题的核心考点分析'; // 默认值
-    let answerFramework = '高分答案的建议框架'; // 默认值
-    const { data: qData, error: qError } = await supabase
-      .from('interview_questions')
-      .select('expected_answer, answer_tips')
-      .eq('question_text', question)
-      .single();
-    if (!qError && qData) {
-      questionAnalysis = qData.expected_answer || questionAnalysis;
-      answerFramework = qData.answer_tips || answerFramework;
-    }
-
-    const requestData: EvaluationRequest = {
-      question,
-      userAnswer,
-      stageType: stage,
-      questionAnalysis,
-      answerFramework
-    }
-
-    const evaluation = await aiEvaluationService.evaluateAnswer(requestData)
-    return NextResponse.json(evaluation)
-  } catch (error) {
-    console.error("💥 [API] 单题评估错误:", error)
-    return NextResponse.json(
-      {
-        error: "单题评估失败",
-        message: error instanceof Error ? error.message : "未知错误",
-      },
-      { status: 500 }
-    )
-  }
-}
-  try {
-    console.log("🚀 [API] 开始处理API式教练评估请求")
-
     if (!SILICONFLOW_API_KEY) {
       console.error("❌ [API] SiliconFlow API密钥未配置")
       return NextResponse.json(

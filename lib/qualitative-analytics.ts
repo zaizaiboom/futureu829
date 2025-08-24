@@ -3,7 +3,8 @@ import {
   CompetencyLevel, 
   CompetencyTagTrend, 
   QualitativeCompetencyData,
-  QualitativeAnalytics 
+  QualitativeAnalytics,
+  ActionItem 
 } from '@/types/qualitative-feedback';
 
 // 定义核心能力维度
