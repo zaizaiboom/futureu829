@@ -197,7 +197,18 @@ class AIEvaluationService {
   }
 }
 
-export const aiEvaluationService = new AIEvaluationService()
+// 延迟实例化，避免在客户端环境中执行构造函数
+let _aiEvaluationService: AIEvaluationService | null = null
+
+export const getAIEvaluationService = (): AIEvaluationService => {
+  if (!_aiEvaluationService) {
+    _aiEvaluationService = new AIEvaluationService()
+  }
+  return _aiEvaluationService
+}
+
+// 导出类本身，让API路由可以按需实例化
+export { AIEvaluationService }
 
 // 注意：请确保你的 'types/evaluation.ts' 文件也同步更新
 export type { 

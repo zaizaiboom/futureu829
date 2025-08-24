@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { aiEvaluationService } from "../../../lib/ai-service"
+import { getAIEvaluationService } from "../../../lib/ai-service"
 import { createClient } from '@supabase/supabase-js'
 import type {
   EvaluationRequest,
@@ -125,13 +125,15 @@ console.log("🎯 [API] 开始逐题评估处理:", {
       console.log(`📝 [API] 评估第${index + 1}题:`, question.substring(0, 50) + "...")
       
       try {
-        const result = await aiEvaluationService.evaluateAnswer(requestData)
+        const aiService = getAIEvaluationService()
+        const result = await aiService.evaluateAnswer(requestData)
         console.log(`✅ [API] 第${index + 1}题评估完成:`)
         return result
       } catch (error) {
         console.error(`💥 [API] 第${index + 1}题评估失败:`, error)
         // 返回备用评估结果
-        return aiEvaluationService.generateFallbackEvaluation(requestData)
+        const aiService = getAIEvaluationService()
+        return aiService.generateFallbackEvaluation(requestData)
       }
     })
 
@@ -158,7 +160,8 @@ console.log("🎯 [API] 开始逐题评估处理:", {
           userAnswer: answers[index] || "未回答"
         }
         // 返回一个超级备用评估，以确保前端能收到一个有效的对象结构
-        return aiEvaluationService.generateFallbackEvaluation(requestData, result.reason)
+        const aiService = getAIEvaluationService()
+        return aiService.generateFallbackEvaluation(requestData, result.reason)
       }
     })
     

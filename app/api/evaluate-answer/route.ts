@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { aiEvaluationService } from "../../../lib/ai-service"
+import { getAIEvaluationService } from "../../../lib/ai-service"
 import { createClient } from '@supabase/supabase-js'
 
 const SILICONFLOW_API_URL = "https://api.siliconflow.cn/v1/chat/completions"
