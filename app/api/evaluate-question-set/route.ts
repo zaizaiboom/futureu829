@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { aiEvaluationService } from "../../../lib/ai-service"
+import { createClient } from '@supabase/supabase-js'
 import type {
   EvaluationRequest,
   IndividualEvaluationResponse,
@@ -76,7 +77,8 @@ async function processEvaluation(
   questionSetIndex: number,
   evaluationId?: string,
 ): Promise<AggregatedReport> {
-  console.log("🎯 [API] 开始逐题评估处理:", {
+  const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
+console.log("🎯 [API] 开始逐题评估处理:", {
     stageType,
     stageTitle,
     questionSetIndex,
@@ -90,8 +92,23 @@ async function processEvaluation(
     const evaluationPromises = questions.map(async (question, index) => {
       const userAnswer = answers[index] || "未回答"
       
+      // 查询问题分析和回答框架
+      let questionAnalysis = '本题的核心考点分析'; // 默认值
+      let answerFramework = '高分答案的建议框架'; // 默认值
+      const { data: qData, error: qError } = await supabase
+        .from('interview_questions')
+        .select('expected_answer, answer_tips')
+        .eq('question_text', question)
+        .single();
+      if (!qError && qData) {
+        questionAnalysis = qData.expected_answer || questionAnalysis;
+        answerFramework = qData.answer_tips || answerFramework;
+      }
+
       // 构建单题评估请求
       const requestData: EvaluationRequest = {
+        questionAnalysis,
+        answerFramework,
         question,
         category: stageType,
         difficulty: "中等", // 可以根据实际需求调整
@@ -214,7 +231,7 @@ async function generateOverallSummary(
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "deepseek-ai/DeepSeek-V2", // 使用更强大的模型进行汇总
+        model: "deepseek-ai/DeepSeek-V3", // 使用您指定的 DeepSeek-V3 模型
         messages: [
           {
             role: "system",

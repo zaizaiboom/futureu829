@@ -12,6 +12,8 @@ export interface EvaluationRequest {
   category: string
   difficulty: string
   stageType: string
+  questionAnalysis: string
+  answerFramework: string
 }
 
 /**
@@ -45,6 +47,10 @@ export interface IndividualEvaluationResponse {
   strengths: Strength[]
   improvements: Improvement[]
   followUpQuestion: string
+  expertGuidance: {
+    questionAnalysis: string
+    answerFramework: string
+  }
 }
 
 /**

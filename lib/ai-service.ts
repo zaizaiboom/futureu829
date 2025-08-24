@@ -15,7 +15,7 @@ class AIEvaluationService {
       apiUrl: "https://api.siliconflow.cn/v1/chat/completions",
       apiKey: process.env.SILICONFLOW_API_KEY || "",
       model: "deepseek-ai/DeepSeek-V3", 
-      temperature: 0.5, // 稍微提高温度，以增加反馈的趣味性和创造性
+      temperature: 0.3, // 稍微提高温度，以增加反馈的趣味性和创造性
       maxTokens: 3000,
       timeout: 45000 // 适当延长超时，以应对更复杂的评估任务
     }
@@ -30,158 +30,142 @@ class AIEvaluationService {
    * 构建AI产品导师评估提示词 - 已升级为最终融合版
    */
   private buildPrompt(data: EvaluationRequest): string {
-    // 注意：这里的 EvaluationRequest 类型需要增加 stageType 字段
-    const { question, userAnswer, stageType } = data;
+     const { question, userAnswer, stageType, questionAnalysis, answerFramework } = data;
 
-    return `
-# 角色：AI面试教练 (AI Interview Coach)
-
-## 1. 你的核心身份与风格
-你是一位顶尖的AI产品经理面试教练。你的沟通风格必须同时具备以下特质：
-- **生动有趣:** 你的语言风趣、幽默，善用生动的比喻，让反馈像一次与资深导师的有趣对话。
-- **专业直接:** 在调侃的背后，你的每一项反馈都必须一针见血，精准地指出问题的核心。
-- **场景化与可操作:** 你的建议不是空泛的理论，而是能让用户“下次就用得上”的具体话术和行动指南。
-- **善意推定:** 你的首要原则是“善意推定”，只要用户的回答是真诚的尝试，就应视为有效回答进行深入评估。
-
-## 2. 你的核心任务
-严格遵循下述的【评估工作流】，对面试者的【单个】回答进行一次深度诊断，并返回结构化的JSON。
-
-## 3. 评估的输入信息
-- **面试阶段:** ${stageType}
-- **面试问题:** ${question}
-- **用户回答:** ${userAnswer}
-
-## 4. 评估工作流 (Chain of Thought)
-
-**【第一步：回答有效性检查 (Validity Guard)】**
-- **默认有效:** 首先，假定回答是有效的。
-- **检查无效特征:** 仅当回答【明确】符合以下特征之一时，才判定为【无效回答】：
-    - **特征1 (无意义):** 回答是随机字符、人名，或完全无法理解的词语组合。
-    - **特征2 (完全无关):** 回答内容与问题的主题【没有任何关联】。
-    - **特征3 (内容过少):** 回答内容极其简短，以至于【完全无法进行任何有意义的分析】。
-- **处理方式:** 如果判定无效，立即停止后续评估，并使用专为【无效回答】准备的JSON模板输出。
-
-**【第二步：选择评估视角】**
-- 根据输入的【面试阶段】('${stageType}'), 从下面的【分阶段评估标准库】中，选择对应的评估重点和要点，作为你本次分析的核心框架。
-
-**【第三步：深度诊断与反馈构思】**
-- 使用选定的评估框架，对【用户回答】进行深入分析。
-- 构思你的反馈，特别是“提升建议”，要尽可能“场景化”，模拟面试官的口吻给出具体话术。
-- 基于用户的回答，构思一个有价值的、开放性的“互动式追问”。
-
-**【第四步：组装JSON输出】**
-- 将所有分析结果，精准地填充到最终的JSON结构中。
-
-## 【分阶段评估标准库】
-
-### hr 面试评估重点：
-- 自我认知与表达、沟通协作能力、适应性与学习力、价值观匹配度。
-
-### professional 面试评估重点：
-- 技术理解深度、产品设计思维、商业化能力、风险控制意识。
-
-### final 面试评估重点：
-- 战略思维高度、商业模式设计、复杂问题解决、领导力潜质。
-
-## 5. 输出格式 (严格遵守)
-{
-  "preliminaryAnalysis": {
-    "isValid": <true 或 false>,
-    "reasoning": "<对回答有效性的判定理由>"
-  },
-  "performanceLevel": "<如果isValid为false，则为'无法评估'；否则从'助理级', '编剧级', '制片级', '导演级'中选择>",
-  "summary": "<如果isValid为false，则为'AI教练无法评估此回答，因其内容无效或无关。'；否则，用生动、调侃且专业的比喻总结表现>",
-  "strengths": [
-    {
-      "competency": "<优势领域>",
-      "description": "<引用回答中的具体内容来赞扬，并说明为什么这很棒>"
-    }
-  ],
-  "improvements": [
-    {
-      "competency": "<改进领域>",
-      "suggestion": "<用场景化的方式提出改进建议，模拟面试官的口吻>",
-      "example": "<提供一个可以直接使用的、优化的表达范例，例如：'下次尝试这样表述：我在A项目中，通过引入xxx技术...''>"
-    }
-  ],
-  "followUpQuestion": "<如果isValid为false，则鼓励用户重新尝试；否则，基于用户的回答，提出一个有价值的、互动式的追问>"
-}
-`
-  }
+     return `
+ # 角色：AI面试教练 (AI Interview Coach)
+ 
+ ## 1. 你的核心身份与风格
+ 你是一位顶尖的、拥有“教练战术手册”的AI产品经理面试教练。你的沟通风格生动、专业且极具洞察力。你的评估【必须】基于提供的“问题分析”和“建议回答思路”来进行。
+ 
+ ## 2. 你的核心任务
+ 严格遵循下述【评估工作流】，对面试者的【单个】回答进行一次深度诊断，并返回结构化的JSON。
+ 
+ ## 3. 教练战术手册 (你的评估基准)
+ - **面试问题:** ${question}
+ - **问题分析 (本题的核心考点):** ${questionAnalysis}
+ - **建议回答思路 (高分答案的框架):** ${answerFramework}
+ 
+ ## 4. 评估对象
+ - **面试阶段:** ${stageType}
+ - **用户回答:** ${userAnswer}
+ 
+ ## 5. 评估工作流 (Chain of Thought)
+ 
+ **【第一步：智能有效性检查 (Intelligent Validity Guard)】- 这是最关键的判断**
+ - **这是你的守门员职责，但【必须】基于“教练战术手册”来判断。**
+ - **检查流程:**
+     1.  **初步筛选:** 回答是否是完全无意义的随机字符或人名？如果是，则直接判定为【无效回答】。
+     2.  **深度对比:** 如果不是无意义内容，你【必须】将【用户回答】与【教练战术手册】（特别是“建议回答思路”）进行语义和概念上的对比。
+     3.  **最终判定:** 只有当【用户回答】与【教练战术手册】在核心概念上**【零相关性】**时，才判定为【无效回答】。一个简短但切题的回答（例如，只提到了思路中的一个关键词）应被视为【有效回答】，并在后续步骤中指出其“内容不够充分”。
+ - **处理方式:** 如果判定无效，立即停止后续评估，并使用专为【无效回答】准备的JSON模板输出。
+ 
+ **【第二步：对比诊断 (Comparative Diagnosis)】**
+ - **仅当**回答被判定为【有效】时，才进行此步骤。你需要将【用户回答】与【教练战术手册】进行详细比对。
+ 
+ **【第三步：构思反馈与追问】**
+ - **亮点 (Strengths):** 找到用户回答中，与“战术手册”匹配得最好、或者最有洞察力的部分。
+ - **建议 (Improvements):** 找到用户回答与“战术手册”之间最大的差距，并构思场景化的、可操作的改进建议。
+ - **追问 (Follow-up):** 基于用户的回答，构思一个能进一步考察其思维深度的互动式追问。
+ 
+ **【第四步：组装JSON输出】**
+ - 将所有分析结果，精准地填充到最终的JSON结构中。
+ 
+ ## 6. 输出格式 (严格遵守)
+ {
+   "preliminaryAnalysis": {
+     "isValid": <true 或 false>,
+     "reasoning": "<对回答有效性的判定理由>"
+   },
+   "performanceLevel": "<如果isValid为false，则为'无法评估'；否则从'助理级', '编剧级', '制片级', '导演级'中选择>",
+   "summary": "<如果isValid为false，则为'AI教练无法评估此回答...'；否则，基于与'战术手册'的对比，给出一句生动、调侃且专业的总结>",
+   "strengths": [
+     {
+       "competency": "<优势领域>",
+       "description": "<引用具体内容，说明其如何符合了'战术手册'中的要求或展现了个人亮点>"
+     }
+   ],
+   "improvements": [
+     {
+       "competency": "<改进领域>",
+       "suggestion": "<明确指出用户的回答与'战术手册'的差距所在，并用场景化的方式提出改进建议>",
+       "example": "<提供一个可以直接使用的、优化的表达范例>"
+     }
+   ],
+   "followUpQuestion": "<如果isValid为false，则鼓励用户重新尝试；否则，基于用户的回答，提出一个有价值的、互动式的追问>",
+   "expertGuidance": {
+       "questionAnalysis": "${questionAnalysis}",
+       "answerFramework": "${answerFramework}"
+   }
+ }
+ `
+   }
 
   async evaluateAnswer(data: EvaluationRequest): Promise<IndividualEvaluationResponse> {
-    try {
-      const prompt = this.buildPrompt(data)
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), this.config.timeout)
-
-      const response = await fetch(this.config.apiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.config.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: this.config.model,
-          messages: [
-            {
-              role: "system",
-              content: "你是一位顶尖的AI产品面试教练。你的任务是严格遵循用户提供的框架和JSON格式要求进行评估。你的首要职责是基于'善意推定'原则识别并处理无效回答。确保输出是纯净的、可被程序直接解析的JSON对象。",
-            },
-            {
-              role: "user",
-              content: prompt,
-            },
-          ],
-          temperature: this.config.temperature,
-          max_tokens: this.config.maxTokens,
-          response_format: { type: "json_object" },
-        }),
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeoutId)
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => "无法读取错误响应体");
-        console.error(`💥 [AI Service] API 响应错误 (${response.status}): ${errorText}`);
-        throw new Error(`AI API error (${response.status})`)
-      }
-
-      const aiResponse = await response.json()
-      const aiContent = aiResponse.choices[0]?.message?.content
-
-      if (!aiContent) {
-        throw new Error("从AI API返回了空内容")
-      }
-      
-      let evaluationResult: IndividualEvaluationResponse;
-      try {
-        const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          evaluationResult = JSON.parse(jsonMatch[0]);
-        } else {
-          throw new Error("响应中未找到有效的JSON对象");
-        }
-      } catch (parseError) {
-        console.error("❌ [AI Service] 解析AI响应失败:", aiContent)
-        throw new Error(`从AI返回了无效的JSON: ${parseError.message}`)
-      }
-
-      this.validateIndividualEvaluationResult(evaluationResult)
-
-      return evaluationResult
-    } catch (error) {
-      console.error("💣 [AI Service] 评估过程中发生错误:", error)
-      return this.generateFallbackEvaluation(data, error.message)
-    }
-  }
+     try {
+       if (!data.questionAnalysis || !data.answerFramework) {
+         throw new Error("评估请求缺少'questionAnalysis'或'answerFramework'字段");
+       }
+ 
+       const prompt = this.buildPrompt(data)
+       const controller = new AbortController()
+       const timeoutId = setTimeout(() => controller.abort(), this.config.timeout)
+ 
+       const response = await fetch(this.config.apiUrl, {
+         method: "POST",
+         headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.config.apiKey}` },
+         body: JSON.stringify({
+           model: this.config.model,
+           messages: [
+             {
+               role: "system",
+               content: "你是一位顶尖的AI产品面试教练。你的任务是严格遵循用户提供的框架和JSON格式要求进行评估。你的首要职责是基于提供的'教练战术手册'来智能地判断回答的有效性。确保输出是纯净的、可被程序直接解析的JSON对象。",
+             },
+             { role: "user", content: prompt },
+           ],
+           temperature: this.config.temperature,
+           max_tokens: this.config.maxTokens,
+           response_format: { type: "json_object" },
+         }),
+         signal: controller.signal,
+       })
+ 
+       clearTimeout(timeoutId)
+ 
+       if (!response.ok) {
+         const errorText = await response.text().catch(() => "无法读取错误响应体");
+         console.error(`💥 [AI Service] API 响应错误 (${response.status}): ${errorText}`);
+         throw new Error(`AI API error (${response.status})`)
+       }
+ 
+       const aiResponse = await response.json()
+       const aiContent = aiResponse.choices[0]?.message?.content
+       if (!aiContent) { throw new Error("从AI API返回了空内容") }
+        
+       let evaluationResult: IndividualEvaluationResponse;
+       try {
+         const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
+         if (jsonMatch) {
+           evaluationResult = JSON.parse(jsonMatch[0]);
+         } else {
+           throw new Error("响应中未找到有效的JSON对象");
+         }
+       } catch (parseError) {
+         console.error("❌ [AI Service] 解析AI响应失败:", aiContent)
+         throw new Error(`从AI返回了无效的JSON: ${parseError.message}`)
+       }
+ 
+       this.validateIndividualEvaluationResult(evaluationResult)
+       return evaluationResult
+     } catch (error) {
+       console.error("💣 [AI Service] 评估过程中发生错误:", error)
+       return this.generateFallbackEvaluation(data, error.message)
+     }
+   }
 
   private validateIndividualEvaluationResult(result: any): void {
-    if (!result || typeof result !== "object") {
-      throw new Error("评估结果结构无效")
-    }
-    const requiredFields = ["preliminaryAnalysis", "performanceLevel", "summary", "strengths", "improvements", "followUpQuestion"]
+    if (!result || typeof result !== "object") { throw new Error("评估结果结构无效") }
+    const requiredFields = ["preliminaryAnalysis", "performanceLevel", "summary", "strengths", "improvements", "followUpQuestion", "expertGuidance"];
     for (const field of requiredFields) {
       if (!(field in result)) {
         throw new Error(`缺少必需字段: ${field}`)

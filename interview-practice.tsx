@@ -116,11 +116,6 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
     return 'individualEvaluations' in data && 'overallSummary' in data;
   }
 
-  // 检查是否为旧版评估格式
-  const isLegacyEvaluation = (data: any): boolean => {
-    return data && 'encouragement' in data;
-  }
-
   // 获取历史反馈的等级
   const getHistoryFeedbackLevel = (feedback: EvaluationResult): string => {
     return feedback.overallSummary.overallLevel || '良好表现';
@@ -139,6 +134,11 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
   // 获取历史反馈的改进建议
   const getHistoryFeedbackImprovements = (feedback: EvaluationResult) => {
     return feedback.overallSummary.improvements || [];
+  }
+
+  // 检查是否为旧版评估格式
+  const isLegacyEvaluation = (feedback: any): boolean => {
+    return feedback && typeof feedback === 'object' && 'encouragement' in feedback;
   }
   // 状态管理
   const [currentStep, setCurrentStep] = useState<"overview" | "answering" | "analyzing" | "result">("overview")
