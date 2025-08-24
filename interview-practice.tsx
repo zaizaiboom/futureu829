@@ -31,9 +31,7 @@ import {
   Settings,
 } from "lucide-react"
 import { getRandomQuestions, getQuestionCount, type Question, getQuestionStats } from "@/lib/questions-service"
-import { QuickTips } from "@/components/quick-tips"
 import type { AggregatedReport, IndividualEvaluationResponse } from "@/types/evaluation"
-import { getHistoryFeedbackNextSteps } from './lib/qualitative-analytics';
 
 // TypeScript类型定义
 declare global {
@@ -64,9 +62,11 @@ declare global {
     continuous: boolean
     interimResults: boolean
     lang: string
+    maxAlternatives: number
     onresult: (event: SpeechRecognitionEvent) => void
     onerror: (event: SpeechRecognitionErrorEvent) => void
     onend: () => void
+    onstart: () => void
     start: () => void
     stop: () => void
   }
@@ -116,30 +116,6 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
     return 'individualEvaluations' in data && 'overallSummary' in data;
   }
 
-  // 获取历史反馈的等级
-  const getHistoryFeedbackLevel = (feedback: EvaluationResult): string => {
-    return feedback.overallSummary.overallLevel || '良好表现';
-  }
-
-  // 获取历史反馈的总结
-  const getHistoryFeedbackSummary = (feedback: EvaluationResult): string => {
-    return feedback.overallSummary.summary || '暂无评估总结';
-  }
-
-  // 获取历史反馈的优势
-  const getHistoryFeedbackStrengths = (feedback: EvaluationResult) => {
-    return feedback.overallSummary.strengths || [];
-  }
-
-  // 获取历史反馈的改进建议
-  const getHistoryFeedbackImprovements = (feedback: EvaluationResult) => {
-    return feedback.overallSummary.improvements || [];
-  }
-
-  // 检查是否为旧版评估格式
-  const isLegacyEvaluation = (feedback: any): boolean => {
-    return feedback && typeof feedback === 'object' && 'encouragement' in feedback;
-  }
   // 状态管理
   const [currentStep, setCurrentStep] = useState<"overview" | "answering" | "analyzing" | "result">("overview")
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
@@ -147,7 +123,6 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
   const [currentAnswer, setCurrentAnswer] = useState("")
   const [timeLeft, setTimeLeft] = useState(0)
   const [feedback, setFeedback] = useState<EvaluationResult | null>(null)
-  const [history, setHistory] = useState<EvaluationResult[]>([])
   const [evaluationError, setEvaluationError] = useState<string | null>(null)
   const [stageProgress, setStageProgress] = useState(0)
   const [isEvaluating, setIsEvaluating] = useState(false)
@@ -215,215 +190,26 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
     }
   }
 
-  // 语音识别初始化
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      console.log("🎤 检查语音识别支持...")
-      const SpeechRecognitionConstructor = window.SpeechRecognition || window.webkitSpeechRecognition
-
-      if (SpeechRecognitionConstructor) {
-        console.log("✅ 浏览器支持语音识别")
-        try {
-          const recog = new SpeechRecognitionConstructor() as SpeechRecognition
-          // 优化配置
-          recog.continuous = true // 启用连续识别
-          recog.interimResults = true // 启用中间结果
-          recog.lang = "zh-CN"
-          recog.maxAlternatives = 1 // 只返回最佳结果
-
-          recog.onstart = () => {
-            console.log("🎤 语音识别已启动")
-            setIsRecording(true)
-            setSpeechError(null)
-          }
-
-          recog.onresult = (event: SpeechRecognitionEvent) => {
-            console.log("🎤 收到语音识别结果:", event.results)
-
-            let interim = ""
-            let final = ""
-
-            // 处理所有结果
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-              const transcript = event.results[i][0].transcript
-
-              if (event.results[i].isFinal) {
-                // 处理最终结果，添加智能标点
-                final += addSmartPunctuation(transcript)
-                console.log("🎤 最终识别文本:", final)
-              } else {
-                // 处理中间结果
-                interim += transcript
-              }
-            }
-
-            setInterimTranscript(interim)
-
-            if (final) {
-              setFinalTranscript((prev) => prev + final)
-              setCurrentAnswer((prev) => {
-                const newAnswer = prev + final
-                return newAnswer
-              })
-
-              // 清空中间结果
-              setInterimTranscript("")
-            }
-          }
-
-          recog.onerror = (event: SpeechRecognitionErrorEvent) => {
-            console.error("🎤 语音识别错误:", event.error, event)
-
-            // 根据错误类型提供不同的提示
-            let errorMessage = "语音识别出现问题"
-            let shouldRestart = false
-
-            switch (event.error) {
-              case "network":
-                errorMessage = "网络连接问题，语音识别需要网络支持。请检查网络连接。"
-                shouldRestart = true
-                break
-              case "not-allowed":
-                errorMessage = "请允许麦克风权限以使用语音输入。点击浏览器地址栏的麦克风图标允许权限。"
-                setIsRecording(false)
-                break
-              case "no-speech":
-                errorMessage = "未检测到语音，继续监听中..."
-                shouldRestart = true
-                break
-              case "audio-capture":
-                errorMessage = "麦克风无法访问，请检查设备连接"
-                setIsRecording(false)
-                break
-              case "service-not-allowed":
-                errorMessage = "语音识别服务不可用，请使用键盘输入"
-                setIsRecording(false)
-                break
-              case "aborted":
-                // 用户主动停止，不显示错误
-                return
-              default:
-                errorMessage = `语音识别错误: ${event.error}`
-                setIsRecording(false)
-            }
-
-            setSpeechError(errorMessage)
-
-            // 对于某些错误，尝试自动重启
-            if (shouldRestart && isRecording && !isPaused) {
-              setTimeout(() => {
-                try {
-                  recog.start()
-                  setSpeechError(null)
-                } catch (restartError) {
-                  console.error("❌ 自动重启失败:", restartError)
-                }
-              }, 1000)
-            } else {
-              // 3秒后清除错误信息（除非是权限错误）
-              if (event.error !== "not-allowed") {
-                setTimeout(() => setSpeechError(null), 3000)
-              }
-            }
-          }
-
-          recog.onend = () => {
-            console.log("🎤 语音识别已结束")
-
-            // 如果还在录音状态且未暂停，自动重启
-            if (isRecording && !isPaused) {
-              console.log("🎤 自动重启语音识别...")
-              setTimeout(() => {
-                try {
-                  recog.start()
-                } catch (error) {
-                  console.error("❌ 自动重启失败:", error)
-                  setIsRecording(false)
-                }
-              }, 100)
-            } else {
-              setIsRecording(false)
-            }
-          }
-
-          setRecognition(recog)
-          console.log("✅ 语音识别初始化完成")
-        } catch (error) {
-          console.error("❌ 语音识别初始化失败:", error)
-          setSpeechError("语音识别初始化失败，请使用键盘输入")
-        }
-      } else {
-        console.warn("❌ 浏览器不支持语音识别")
-        setSpeechError("当前浏览器不支持语音识别，请使用键盘输入")
-      }
-    }
-  }, [])
-
-  // 语音合成初始化
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      console.log("🔊 初始化语音合成...")
-
-      // 获取可用语音列表
-      const loadVoices = () => {
-        const voices = window.speechSynthesis.getVoices()
-        console.log(
-          "🔊 可用语音:",
-          voices.map((v) => ({ name: v.name, lang: v.lang })),
-        )
-
-        // 筛选中文语音
-        const chineseVoices = voices.filter((voice) => voice.lang.includes("zh") || voice.lang.includes("CN"))
-
-        setAvailableVoices(chineseVoices.length > 0 ? chineseVoices : voices)
-
-        // 自动选择最佳中文语音
-        const bestVoice =
-          chineseVoices.find((voice) => voice.name.includes("Microsoft") || voice.name.includes("Google")) ||
-          chineseVoices[0] ||
-          voices[0]
-
-        if (bestVoice) {
-          setSelectedVoice(bestVoice)
-          console.log("🔊 选择语音:", bestVoice.name)
-        }
-      }
-
-      // 语音列表可能需要异步加载
-      if (window.speechSynthesis.getVoices().length > 0) {
-        loadVoices()
-      } else {
-        window.speechSynthesis.onvoiceschanged = loadVoices
-      }
-    } else {
-      console.warn("❌ 浏览器不支持语音合成")
-    }
-  }, [])
-
   // 智能标点符号添加
   const addSmartPunctuation = (text: string): string => {
-  if (typeof text !== 'string' || !text.trim()) return '';
+    if (typeof text !== 'string' || !text.trim()) return '';
 
-  let result = text.trim();
+    let result = text.trim();
 
-  if (!/[。！？，、；：]$/.test(result)) {
-    if (/^(什么|怎么|为什么|哪里|哪个|如何|是否|能否|可以|会不会)/.test(result.toLowerCase()) || /吗$/.test(result)) {
-      result += "？";
-    } else {
-      result += "。";
+    if (!/[。！？，、；：]$/.test(result)) {
+      if (/^(什么|怎么|为什么|哪里|哪个|如何|是否|能否|可以|会不会)/.test(result.toLowerCase()) || /吗$/.test(result)) {
+        result += "？";
+      } else {
+        result += "。";
+      }
     }
+
+    return " " + result;
   }
 
-  return " " + result;
-}
-
-  // 加载题目和历史记录
+  // 加载题目
   useEffect(() => {
     loadQuestions()
-    const savedHistory = localStorage.getItem(`interviewHistory_${moduleType}`)
-    if (savedHistory) {
-      setHistory(JSON.parse(savedHistory))
-    }
   }, [moduleType])
 
   // 计时器
@@ -508,7 +294,6 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
           summary: evaluationResult.overallSummary.summary,
           strengths: evaluationResult.overallSummary.strengths,
           improvements: evaluationResult.overallSummary.improvements,
-          // nextSteps and encouragement are not in the new model, so we remove them
         }
       }
 
@@ -531,7 +316,6 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
       console.log("✅ [前端] 练习记录保存成功:", result)
     } catch (error) {
       console.error("💥 [前端] 保存练习记录失败:", error)
-      // Do not re-throw, as this is a non-critical background task
     }
   }
 
@@ -585,11 +369,7 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
         const aggregatedReport: AggregatedReport = responseData
         setFeedback(aggregatedReport)
         setCurrentStep("result")
-        const newHistory = [...history, aggregatedReport]
-        setHistory(newHistory)
-        localStorage.setItem(`interviewHistory_${moduleType}`, JSON.stringify(newHistory))
         
-        // 保存练习记录到数据库 (fire and forget)
         savePracticeSession(aggregatedReport, allAnswers)
         
         console.log("✅ [前端] 新版评估完成:", {
@@ -609,11 +389,7 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
       const fallbackResult = generateFallbackEvaluation()
       setFeedback(fallbackResult)
       setCurrentStep("result")
-      const newHistory = [...history, fallbackResult]
-      setHistory(newHistory)
-      localStorage.setItem(`interviewHistory_${moduleType}`, JSON.stringify(newHistory))
       
-      // 保存备用评估结果到数据库
       savePracticeSession(fallbackResult, allAnswers)
       
       console.log("🔄 [前端] 使用备用评估结果")
@@ -664,209 +440,131 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
     }
   }
 
-  // 语音识别控制
-  const toggleRecording = async () => {
+  // 语音识别初始化
+  useEffect(() => {
+    if (typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+      const recognition = new SpeechRecognition()
+      
+      recognition.continuous = true
+      recognition.interimResults = true
+      recognition.lang = 'zh-CN'
+      recognition.maxAlternatives = 1
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        let interim = ''
+        let final = ''
+        
+        for (let i = event.results.length - 1; i >= 0; i--) {
+          const result = event.results[i]
+          if (result.isFinal) {
+            final = result[0].transcript
+          } else {
+            interim = result[0].transcript
+          }
+        }
+        
+        setInterimTranscript(interim)
+        if (final) {
+          setFinalTranscript(prev => prev + addSmartPunctuation(final))
+          setCurrentAnswer(prev => prev + addSmartPunctuation(final))
+        }
+      }
+
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.error('语音识别错误:', event.error)
+        setSpeechError(`语音识别错误: ${event.error}`)
+        setIsRecording(false)
+      }
+
+      recognition.onend = () => {
+        setIsRecording(false)
+        setInterimTranscript('')
+      }
+
+      setRecognition(recognition)
+    }
+  }, [])
+
+  // 语音合成初始化
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      const updateVoices = () => {
+        const voices = speechSynthesis.getVoices()
+        const chineseVoices = voices.filter(voice => 
+          voice.lang.includes('zh') || voice.lang.includes('CN')
+        )
+        setAvailableVoices(chineseVoices.length > 0 ? chineseVoices : voices)
+        if (chineseVoices.length > 0 && !selectedVoice) {
+          setSelectedVoice(chineseVoices[0])
+        }
+      }
+      
+      updateVoices()
+      speechSynthesis.onvoiceschanged = updateVoices
+    }
+  }, [])
+
+  // 开始/停止语音识别
+  const toggleRecording = () => {
     if (!recognition) {
-      setSpeechError("语音识别未初始化，请刷新页面重试")
+      setSpeechError('您的浏览器不支持语音识别功能')
       return
     }
 
     if (isRecording) {
-      console.log("🎤 停止语音识别")
-      setIsRecording(false)
-      setIsPaused(false)
       recognition.stop()
-      stopAudioLevelMonitoring()
-      return
-    }
-
-    // 启动语音识别前的检查
-    setSpeechError(null)
-    setIsPaused(false)
-    setInterimTranscript("")
-    setFinalTranscript("")
-    console.log("🎤 准备启动语音识别...")
-
-    try {
-      // 检查麦克风权限
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        try {
-          console.log("🎤 检查麦克风权限...")
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-          console.log("✅ 麦克风权限已获取")
-          // 立即停止流，我们只是检查权限
-          stream.getTracks().forEach((track) => track.stop())
-        } catch (permissionError) {
-          console.error("❌ 麦克风权限被拒绝:", permissionError)
-          setSpeechError('请允许麦克风权限。点击浏览器地址栏的麦克风图标，选择"允许"。')
-          return
-        }
-      }
-
-      console.log("🎤 启动语音识别...")
+      setIsRecording(false)
+    } else {
+      setSpeechError(null)
+      setInterimTranscript('')
       recognition.start()
       setIsRecording(true)
-      startAudioLevelMonitoring()
-      console.log("✅ 语音识别启动成功")
-    } catch (error) {
-      console.error("❌ 启动语音识别失败:", error)
-      setIsRecording(false)
-
-      if (error.name === "InvalidStateError") {
-        setSpeechError("语音识别正在运行中，请稍后再试")
-      } else if (error.name === "NotAllowedError") {
-        setSpeechError("麦克风权限被拒绝，请在浏览器设置中允许麦克风访问")
-      } else {
-        setSpeechError("无法启动语音识别，请检查麦克风设备或使用键盘输入")
-      }
-    }
-  }
-
-  // 暂停/恢复语音识别
-  const togglePause = () => {
-    if (!recognition || !isRecording) return
-
-    if (isPaused) {
-      console.log("🎤 恢复语音识别")
-      setIsPaused(false)
-      try {
-        recognition.start()
-        startAudioLevelMonitoring()
-      } catch (error) {
-        console.error("❌ 恢复语音识别失败:", error)
-      }
-    } else {
-      console.log("🎤 暂停语音识别")
-      setIsPaused(true)
-      recognition.stop()
-      stopAudioLevelMonitoring()
-    }
-  }
-
-  // 开始音量监测
-  const startAudioLevelMonitoring = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const context = new AudioContext()
-      const analyserNode = context.createAnalyser()
-      const source = context.createMediaStreamSource(stream)
-
-      analyserNode.fftSize = 256
-      source.connect(analyserNode)
-
-      setAudioContext(context)
-      setAnalyser(analyserNode)
-
-      const dataArray = new Uint8Array(analyserNode.frequencyBinCount)
-
-      const updateAudioLevel = () => {
-        if (analyserNode) {
-          analyserNode.getByteFrequencyData(dataArray)
-          const average = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length
-          const level = Math.round((average / 255) * 100)
-          setAudioLevel(level)
-
-          if (isRecording && !isPaused) {
-            requestAnimationFrame(updateAudioLevel)
-          }
-        }
-      }
-
-      updateAudioLevel()
-    } catch (error) {
-      console.error("❌ 音量监测启动失败:", error)
-    }
-  }
-
-  // 停止音量监测
-  const stopAudioLevelMonitoring = () => {
-    if (audioContext) {
-      audioContext.close()
-      setAudioContext(null)
-      setAnalyser(null)
-      setAudioLevel(0)
     }
   }
 
   // 朗读题目
-  const speakQuestion = () => {
-    if (!window.speechSynthesis || !selectedVoice || !questions[currentQuestionIndex]) {
-      console.warn("❌ 语音合成不可用")
+  const speakQuestion = (text: string) => {
+    if (!('speechSynthesis' in window)) {
+      alert('您的浏览器不支持语音合成功能')
       return
     }
 
     // 停止当前朗读
-    window.speechSynthesis.cancel()
-
-    const questionText = questions[currentQuestionIndex].question_text
-    console.log("🔊 开始朗读题目:", questionText)
-
-    const utterance = new SpeechSynthesisUtterance(questionText)
-    utterance.voice = selectedVoice
+    speechSynthesis.cancel()
+    
+    const utterance = new SpeechSynthesisUtterance(text)
     utterance.rate = speechRate
     utterance.volume = speechVolume
-    utterance.lang = "zh-CN"
-
-    utterance.onstart = () => {
-      console.log("🔊 朗读开始")
-      setIsSpeaking(true)
-      setSpeechProgress(0)
+    utterance.lang = 'zh-CN'
+    
+    if (selectedVoice) {
+      utterance.voice = selectedVoice
     }
 
+    utterance.onstart = () => setIsSpeaking(true)
     utterance.onend = () => {
-      console.log("🔊 朗读结束")
       setIsSpeaking(false)
-      setSpeechProgress(100)
-
-      // 朗读完成后聚焦到答案输入框
-      setTimeout(() => {
-        const textarea = document.querySelector('textarea[placeholder*="请输入"]') as HTMLTextAreaElement
-        if (textarea) {
-          textarea.focus()
-        }
-      }, 500)
+      setSpeechProgress(0)
     }
-
-    utterance.onerror = (event) => {
-      console.error("🔊 朗读错误:", event.error)
+    utterance.onerror = () => {
       setIsSpeaking(false)
       setSpeechProgress(0)
     }
 
-    // 模拟朗读进度
-    utterance.onboundary = (event) => {
-      if (event.name === "word") {
-        const progress = Math.min((event.charIndex / questionText.length) * 100, 95)
-        setSpeechProgress(progress)
-      }
+    // 模拟进度
+    utterance.onboundary = () => {
+      setSpeechProgress(prev => Math.min(prev + 10, 90))
     }
 
-    window.speechSynthesis.speak(utterance)
+    speechSynthesis.speak(utterance)
   }
 
   // 停止朗读
   const stopSpeaking = () => {
-    if (window.speechSynthesis) {
-      console.log("🔊 停止朗读")
-      window.speechSynthesis.cancel()
-      setIsSpeaking(false)
-      setSpeechProgress(0)
-    }
-  }
-
-  // 暂停/恢复朗读
-  const toggleSpeaking = () => {
-    if (!window.speechSynthesis) return
-
-    if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
-      console.log("🔊 暂停朗读")
-      window.speechSynthesis.pause()
-    } else if (window.speechSynthesis.paused) {
-      console.log("🔊 恢复朗读")
-      window.speechSynthesis.resume()
-    } else {
-      speakQuestion()
-    }
+    speechSynthesis.cancel()
+    setIsSpeaking(false)
+    setSpeechProgress(0)
   }
 
   // 重新开始练习
@@ -878,45 +576,13 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
     setFeedback(null)
     setEvaluationError(null)
     setStageProgress(0)
+    // 停止语音相关功能
+    if (recognition && isRecording) {
+      recognition.stop()
+    }
+    stopSpeaking()
     loadQuestions()
   }
-
-  // 键盘快捷键支持
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // 只在答题阶段响应快捷键
-      if (currentStep !== "answering") return
-
-      // 检查是否在输入框中
-      const target = event.target as HTMLElement
-      if (target.tagName === "TEXTAREA" || target.tagName === "INPUT") return
-
-      // Ctrl/Cmd + R: 朗读题目
-      if ((event.ctrlKey || event.metaKey) && event.key === "r") {
-        event.preventDefault()
-        speakQuestion()
-      }
-
-      // Ctrl/Cmd + P: 暂停/恢复朗读
-      if ((event.ctrlKey || event.metaKey) && event.key === "p") {
-        event.preventDefault()
-        if (isSpeaking) {
-          toggleSpeaking()
-        }
-      }
-
-      // Ctrl/Cmd + S: 停止朗读
-      if ((event.ctrlKey || event.metaKey) && event.key === "s") {
-        event.preventDefault()
-        if (isSpeaking) {
-          stopSpeaking()
-        }
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown)
-    return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [currentStep, isSpeaking])
 
   // 加载中状态
   if (isLoadingQuestions) {
@@ -976,8 +642,6 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
         {/* 概览阶段 */}
         {currentStep === "overview" && (
           <div className="max-w-4xl mx-auto space-y-6">
-            <QuickTips stage={moduleType as "hr" | "professional" | "final"} />
-
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -985,48 +649,30 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
                   练习概览
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <h3 className="font-semibold mb-2">本轮评估重点</h3>
-                    <p className="text-gray-600 mb-4">{currentStage.description}</p>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-blue-600" />
-                        <span className="text-sm">每题限时5分钟</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Brain className="h-4 w-4 text-green-600" />
-                        <span className="text-sm">共{questions.length}道精选题目</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Mic className="h-4 w-4 text-purple-600" />
-                        <span className="text-sm">支持语音输入</span>
-                      </div>
-                    </div>
+              <CardContent className="space-y-4">
+                <p className="text-gray-600">{currentStage.description}</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-600">{questions.length}</div>
+                    <div className="text-sm text-gray-600">本次练习题目</div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold mb-2">题库统计</h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">本阶段题目总数</span>
-                        <Badge variant="secondary">{totalQuestionsInStage}</Badge>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">全库题目总数</span>
-                        <Badge variant="secondary">{questionStats.totalQuestions}</Badge>
-                      </div>
-                    </div>
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <div className="text-2xl font-bold text-green-600">5</div>
+                    <div className="text-sm text-gray-600">每题时间(分钟)</div>
+                  </div>
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <div className="text-2xl font-bold text-purple-600">{totalQuestionsInStage}</div>
+                    <div className="text-sm text-gray-600">题库总数</div>
                   </div>
                 </div>
-                <div className="mt-6 pt-6 border-t">
-                  <Button onClick={startPractice} size="lg" className="w-full">
-                    <Play className="h-4 w-4 mr-2" />
-                    开始练习
-                  </Button>
-                </div>
+                <Button onClick={startPractice} className="w-full" size="lg">
+                  <Play className="h-4 w-4 mr-2" />
+                  开始练习
+                </Button>
               </CardContent>
             </Card>
+
+
           </div>
         )}
 
@@ -1041,256 +687,181 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
                     题目 {currentQuestionIndex + 1} / {questions.length}
                   </span>
                   <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-orange-600" />
-                    <span className="text-sm font-mono">{formatTime(timeLeft)}</span>
+                    <Clock className="h-4 w-4" />
+                    <span className={`text-sm font-medium ${
+                      timeLeft < 60 ? "text-red-600" : "text-gray-600"
+                    }`}>
+                      {formatTime(timeLeft)}
+                    </span>
                   </div>
                 </div>
-                <Progress value={((currentQuestionIndex + 1) / questions.length) * 100} />
+                <Progress value={stageProgress} className="h-2" />
               </CardContent>
             </Card>
 
             {/* 题目卡片 */}
             <Card>
               <CardHeader>
-                <div className="flex items-start justify-between gap-4">
-                  <CardTitle className="text-lg flex-1">{questions[currentQuestionIndex]?.question_text}</CardTitle>
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                <CardTitle className="text-lg flex items-center justify-between">
+                  <span>{questions[currentQuestionIndex]?.question_text}</span>
+                  <div className="flex items-center gap-2">
+                    {/* 朗读题目按钮 */}
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={isSpeaking ? stopSpeaking : speakQuestion}
-                      className={isSpeaking ? "bg-blue-50 border-blue-200" : ""}
+                      onClick={() => isSpeaking ? stopSpeaking() : speakQuestion(questions[currentQuestionIndex]?.question_text || '')}
+                      className="flex items-center gap-1"
                     >
-                      {isSpeaking ? <VolumeX className="h-4 w-4 mr-1" /> : <Volume2 className="h-4 w-4 mr-1" />}
-                      {isSpeaking ? "停止朗读" : "朗读题目"}
+                      {isSpeaking ? (
+                        <>
+                          <VolumeX className="h-4 w-4" />
+                          停止
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="h-4 w-4" />
+                          朗读
+                        </>
+                      )}
                     </Button>
-
-                    {isSpeaking && (
-                      <Button variant="outline" size="sm" onClick={toggleSpeaking}>
-                        <Pause className="h-4 w-4 mr-1" />
-                        暂停
-                      </Button>
-                    )}
-
-                    <Button variant="outline" size="sm" onClick={speakQuestion} disabled={isSpeaking}>
-                      <RotateCcw className="h-4 w-4 mr-1" />
-                      重读
-                    </Button>
-
-                    <Button variant="outline" size="sm" onClick={() => setShowSpeechSettings(!showSpeechSettings)}>
+                    
+                    {/* 语音设置按钮 */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowSpeechSettings(!showSpeechSettings)}
+                    >
                       <Settings className="h-4 w-4" />
                     </Button>
                   </div>
-                </div>
-
-                {/* 朗读进度指示器 */}
-                {isSpeaking && (
-                  <div className="mt-3">
-                    <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                      <span>朗读进度</span>
-                      <span>{Math.round(speechProgress)}%</span>
-                    </div>
-                    <Progress value={speechProgress} className="h-1" />
-                  </div>
-                )}
-
+                </CardTitle>
+                
                 {/* 语音设置面板 */}
                 {showSpeechSettings && (
-                  <div className="mt-3 p-4 bg-gray-50 rounded-lg border">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Settings className="h-4 w-4 text-gray-600" />
-                      <span className="text-sm font-medium text-gray-700">语音设置</span>
+                  <div className="mt-4 p-4 bg-gray-50 rounded-lg space-y-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">朗读速度</label>
+                      <Slider
+                        value={[speechRate]}
+                        onValueChange={(value) => setSpeechRate(value[0])}
+                        min={0.5}
+                        max={2}
+                        step={0.1}
+                        className="w-full"
+                      />
+                      <div className="text-xs text-gray-500 mt-1">{speechRate.toFixed(1)}x</div>
                     </div>
-
-                    <div className="space-y-4">
-                      {/* 语速调节 */}
+                    
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">音量</label>
+                      <Slider
+                        value={[speechVolume]}
+                        onValueChange={(value) => setSpeechVolume(value[0])}
+                        min={0}
+                        max={1}
+                        step={0.1}
+                        className="w-full"
+                      />
+                      <div className="text-xs text-gray-500 mt-1">{Math.round(speechVolume * 100)}%</div>
+                    </div>
+                    
+                    {availableVoices.length > 0 && (
                       <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="text-xs font-medium text-gray-600">语速</label>
-                          <span className="text-xs text-gray-500">{speechRate.toFixed(1)}x</span>
-                        </div>
-                        <Slider
-                          value={[speechRate]}
-                          onValueChange={(value) => setSpeechRate(value[0])}
-                          min={0.5}
-                          max={2.0}
-                          step={0.1}
-                          className="w-full"
-                        />
-                        <div className="flex justify-between text-xs text-gray-400 mt-1">
-                          <span>慢</span>
-                          <span>快</span>
-                        </div>
-                      </div>
-
-                      {/* 音量调节 */}
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="text-xs font-medium text-gray-600">音量</label>
-                          <span className="text-xs text-gray-500">{Math.round(speechVolume * 100)}%</span>
-                        </div>
-                        <Slider
-                          value={[speechVolume]}
-                          onValueChange={(value) => setSpeechVolume(value[0])}
-                          min={0.1}
-                          max={1.0}
-                          step={0.1}
-                          className="w-full"
-                        />
-                        <div className="flex justify-between text-xs text-gray-400 mt-1">
-                          <span>小</span>
-                          <span>大</span>
-                        </div>
-                      </div>
-
-                      {/* 声音选择 */}
-                      {availableVoices.length > 0 && (
-                        <div>
-                          <label className="text-xs font-medium text-gray-600 block mb-2">声音</label>
-                          <Select
-                            value={selectedVoice?.name || ""}
-                            onValueChange={(value) => {
-                              const voice = availableVoices.find((v) => v.name === value)
-                              setSelectedVoice(voice || null)
-                            }}
-                          >
-                            <SelectTrigger className="w-full text-xs">
-                              <SelectValue placeholder="选择声音" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {availableVoices.map((voice) => (
-                                <SelectItem key={voice.name} value={voice.name} className="text-xs">
-                                  {voice.name} ({voice.lang})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-
-                      {/* 测试按钮 */}
-                      <div className="pt-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            if (window.speechSynthesis) {
-                              const utterance = new SpeechSynthesisUtterance("这是语音测试")
-                              utterance.rate = speechRate
-                              utterance.volume = speechVolume
-                              if (selectedVoice) utterance.voice = selectedVoice
-                              window.speechSynthesis.speak(utterance)
-                            }
+                        <label className="text-sm font-medium mb-2 block">语音选择</label>
+                        <Select
+                          value={selectedVoice?.name || ''}
+                          onValueChange={(value) => {
+                            const voice = availableVoices.find(v => v.name === value)
+                            setSelectedVoice(voice || null)
                           }}
-                          className="w-full"
                         >
-                          <Volume2 className="h-3 w-3 mr-1" />
-                          测试语音
-                        </Button>
+                          <SelectTrigger>
+                            <SelectValue placeholder="选择语音" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableVoices.map((voice) => (
+                              <SelectItem key={voice.name} value={voice.name}>
+                                {voice.name} ({voice.lang})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* 朗读进度 */}
+                {isSpeaking && (
+                  <div className="mt-2">
+                    <div className="flex items-center gap-2 text-sm text-blue-600">
+                      <Volume2 className="h-4 w-4 animate-pulse" />
+                      正在朗读...
                     </div>
+                    <Progress value={speechProgress} className="h-1 mt-1" />
                   </div>
                 )}
               </CardHeader>
               <CardContent className="space-y-4">
-                <Textarea
-                  value={currentAnswer}
-                  onChange={(e) => setCurrentAnswer(e.target.value)}
-                  placeholder="请输入您的答案..."
-                  className="min-h-[200px]"
-                />
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={toggleRecording}
-                        className={isRecording ? "bg-red-50 border-red-200" : ""}
-                      >
-                        <Mic className={`h-4 w-4 mr-2 ${isRecording ? "text-red-600" : ""}`} />
-                        {isRecording ? "停止录音" : "语音输入"}
-                      </Button>
-
-                      {isRecording && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={togglePause}
-                          className={isPaused ? "bg-yellow-50 border-yellow-200" : ""}
-                        >
-                          {isPaused ? "恢复" : "暂停"}
-                        </Button>
-                      )}
-                    </div>
-
-                    <Button onClick={submitCurrentAnswer} disabled={!currentAnswer.trim()}>
-                      <Send className="h-4 w-4 mr-2" />
-                      {currentQuestionIndex < questions.length - 1 ? "下一题" : "完成答题"}
-                    </Button>
-                  </div>
-
-                  {/* 语音识别状态显示 */}
-                  {isRecording && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div
-                          className={`w-2 h-2 rounded-full ${isPaused ? "bg-yellow-500" : "bg-green-500 animate-pulse"}`}
-                        ></div>
-                        <span className="text-sm font-medium text-blue-700">
-                          {isPaused ? "语音识别已暂停" : "正在监听..."}
-                        </span>
-
-                        {/* 音量指示器 */}
-                        {!isPaused && (
-                          <div className="flex items-center gap-1 ml-auto">
-                            <span className="text-xs text-gray-500">音量:</span>
-                            <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-gradient-to-r from-green-400 to-green-600 transition-all duration-100"
-                                style={{ width: `${Math.max(5, audioLevel)}%` }}
-                              ></div>
-                            </div>
-                            <span className="text-xs text-gray-500 w-8">{Math.round(audioLevel)}%</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {interimTranscript && <p className="text-sm text-gray-600 italic">识别中: {interimTranscript}</p>}
-
-                      {/* 音量提示 */}
-                      {!isPaused && audioLevel < 10 && (
-                        <p className="text-xs text-yellow-600 mt-1">💡 音量较低，请靠近麦克风或提高音量</p>
-                      )}
-                    </div>
-                  )}
-
-                  {speechError && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                      <p className="text-red-700 text-sm">{speechError}</p>
-                    </div>
-                  )}
+                <div className="relative">
+                  <Textarea
+                    placeholder="请输入您的答案，或点击麦克风按钮使用语音输入..."
+                    value={currentAnswer + interimTranscript}
+                    onChange={(e) => setCurrentAnswer(e.target.value)}
+                    className="min-h-[200px] resize-none pr-12"
+                  />
+                  
+                  {/* 语音识别按钮 */}
+                  <Button
+                    variant={isRecording ? "destructive" : "outline"}
+                    size="sm"
+                    onClick={toggleRecording}
+                    className="absolute bottom-3 right-3"
+                  >
+                    {isRecording ? (
+                      <>
+                        <Pause className="h-4 w-4" />
+                        停止
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="h-4 w-4" />
+                        语音
+                      </>
+                    )}
+                  </Button>
                 </div>
-
-                {/* 快捷键提示 */}
-                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-1 mb-2">
-                    <Settings className="h-3 w-3 text-gray-500" />
-                    <span className="text-xs font-medium text-gray-600">快捷键</span>
+                
+                {/* 语音识别状态 */}
+                {isRecording && (
+                  <div className="flex items-center gap-2 text-sm text-red-600">
+                    <Mic className="h-4 w-4 animate-pulse" />
+                    正在录音，请说话...
+                    {interimTranscript && (
+                      <span className="text-gray-500">({interimTranscript})</span>
+                    )}
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-xs text-gray-500">
-                    <div className="flex items-center gap-1">
-                      <kbd className="px-1 py-0.5 bg-white border rounded text-xs">Ctrl+R</kbd>
-                      <span>朗读</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <kbd className="px-1 py-0.5 bg-white border rounded text-xs">Ctrl+P</kbd>
-                      <span>暂停</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <kbd className="px-1 py-0.5 bg-white border rounded text-xs">Ctrl+S</kbd>
-                      <span>停止</span>
-                    </div>
+                )}
+                
+                {/* 语音错误提示 */}
+                {speechError && (
+                  <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+                    {speechError}
                   </div>
+                )}
+                
+                <div className="flex justify-between">
+                  <div className="text-sm text-gray-500">
+                    已输入 {currentAnswer.length} 字符
+                  </div>
+                  <Button 
+                    onClick={submitCurrentAnswer}
+                    disabled={!currentAnswer.trim()}
+                    className="flex items-center gap-2"
+                  >
+                    <Send className="h-4 w-4" />
+                    {currentQuestionIndex < questions.length - 1 ? "下一题" : "完成答题"}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -1302,11 +873,16 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
           <div className="max-w-2xl mx-auto">
             <Card>
               <CardContent className="p-8 text-center">
-                <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-blue-600" />
+                <Brain className="h-12 w-12 animate-pulse mx-auto mb-4 text-blue-600" />
                 <h3 className="text-xl font-semibold mb-2">AI正在分析您的回答</h3>
-                <p className="text-gray-600 mb-6">请稍候，我们正在从多个维度评估您的表现...</p>
+                <p className="text-gray-600 mb-6">请稍候，我们正在为您生成详细的评估报告...</p>
                 <Progress value={stageProgress} className="mb-4" />
-                <p className="text-sm text-gray-500">分析进度: {Math.round(stageProgress)}%</p>
+                <div className="text-sm text-gray-500">{Math.round(stageProgress)}% 完成</div>
+                {evaluationError && (
+                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-red-600 text-sm">{evaluationError}</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -1322,87 +898,60 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
                   评估完成
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  {/* 总体表现 */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge variant={getHistoryFeedbackLevel(feedback) === "优秀表现" ? "default" : "secondary"}>
-                        {getHistoryFeedbackLevel(feedback)}
-                      </Badge>
-                      {isAggregatedReport(feedback) && (
-                        <Badge variant="outline" className="text-xs">
-                          {feedback.questionCount}题套题
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-gray-700">{getHistoryFeedbackSummary(feedback)}</p>
+              <CardContent className="space-y-6">
+                {/* 总体评估 */}
+                <div className="text-center p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600 mb-2">
+                    {feedback.overallSummary.overallLevel}
                   </div>
+                  <p className="text-gray-700">{feedback.overallSummary.summary}</p>
+                </div>
 
-                  {/* 优势 */}
+                {/* 优势分析 */}
+                {feedback.overallSummary.strengths && feedback.overallSummary.strengths.length > 0 && (
                   <div>
-                    <h3 className="font-semibold mb-3 flex items-center gap-2">
-                      <Smile className="h-4 w-4 text-green-600" />
-                      表现亮点
-                    </h3>
+                    <h4 className="font-semibold text-green-600 mb-3 flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4" />
+                      您的优势
+                    </h4>
                     <div className="space-y-3">
-                      {getHistoryFeedbackStrengths(feedback).map((strength, index) => (
-                        <div key={index} className="bg-green-50 p-4 rounded-lg">
-                          <h4 className="font-medium text-green-800">{strength.area}</h4>
-                          <p className="text-green-700 text-sm mt-1">{strength.description}</p>
+                      {feedback.overallSummary.strengths.map((strength, index) => (
+                        <div key={index} className="p-4 bg-green-50 rounded-lg">
+                          <div className="font-medium text-green-800">{strength.competency}</div>
+                          <div className="text-green-700 text-sm mt-1">{strength.description}</div>
                         </div>
                       ))}
                     </div>
                   </div>
+                )}
 
-                  {/* 改进建议 */}
+                {/* 改进建议 */}
+                {feedback.overallSummary.improvements && feedback.overallSummary.improvements.length > 0 && (
                   <div>
-                    <h3 className="font-semibold mb-3 flex items-center gap-2">
-                      <Lightbulb className="h-4 w-4 text-orange-600" />
-                      提升建议
-                    </h3>
+                    <h4 className="font-semibold text-orange-600 mb-3 flex items-center gap-2">
+                      <Lightbulb className="h-4 w-4" />
+                      改进建议
+                    </h4>
                     <div className="space-y-3">
-                      {getHistoryFeedbackImprovements(feedback).map((improvement, index) => (
-                        <div key={index} className="bg-orange-50 p-4 rounded-lg">
-                          <h4 className="font-medium text-orange-800">{improvement.area}</h4>
-                          <p className="text-orange-700 text-sm mt-1">{improvement.suggestion}</p>
+                      {feedback.overallSummary.improvements.map((improvement, index) => (
+                        <div key={index} className="p-4 bg-orange-50 rounded-lg">
+                          <div className="font-medium text-orange-800">{improvement.competency}</div>
+                          <div className="text-orange-700 text-sm mt-1">{improvement.suggestion}</div>
                           {improvement.example && (
-                            <p className="text-orange-600 text-xs mt-2 italic">{improvement.example}</p>
+                            <div className="text-orange-600 text-sm mt-2 italic">
+                              示例：{improvement.example}
+                            </div>
                           )}
                         </div>
                       ))}
                     </div>
                   </div>
+                )}
 
-                  {/* 下一步行动 */}
-                  {getHistoryFeedbackNextSteps(feedback).length > 0 && (
-                    <div>
-                      <h3 className="font-semibold mb-3 flex items-center gap-2">
-                        <Target className="h-4 w-4 text-blue-600" />
-                        行动计划
-                      </h3>
-                      <div className="space-y-3">
-                        {getHistoryFeedbackNextSteps(feedback).map((step, index) => (
-                          <div key={index} className="bg-blue-50 p-4 rounded-lg">
-                            <h4 className="font-medium text-blue-800">{step.action}</h4>
-                            <p className="text-blue-700 text-sm mt-1">{step.description}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 鼓励话语 */}
-                  {isLegacyEvaluation(feedback) && feedback.encouragement && (
-                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg">
-                      <p className="text-purple-700 italic">{feedback.encouragement}</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-8 pt-6 border-t flex gap-4">
-                  <Button onClick={restartPractice} variant="outline" className="flex-1 bg-transparent">
-                    <RefreshCw className="h-4 w-4 mr-2" />
+                {/* 操作按钮 */}
+                <div className="flex gap-3">
+                  <Button onClick={restartPractice} className="flex-1">
+                    <RotateCcw className="h-4 w-4 mr-2" />
                     重新练习
                   </Button>
                   <Button onClick={onBack} className="flex-1">

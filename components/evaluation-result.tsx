@@ -92,37 +92,13 @@ export function EvaluationResult({ result }: EvaluationResultProps) {
       </div>
 
       {/* Detailed Analysis */}
-      <Tabs defaultValue="templates" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="templates">📝 答题模板</TabsTrigger>
+      <Tabs defaultValue="core" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="core">核心能力</TabsTrigger>
           <TabsTrigger value="performance">综合表现</TabsTrigger>
           <TabsTrigger value="highlights">亮点分析</TabsTrigger>
           <TabsTrigger value="improvements">改进建议</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="templates" className="space-y-4">
-          {result.strategicSuggestions.map((suggestion, index) => (
-            <Card key={index} className="border-l-4 border-l-blue-500 bg-blue-50">
-              <CardHeader>
-                <CardTitle className="text-blue-700 flex items-center gap-2">
-                  <Target className="h-5 w-5" />
-                  {suggestion.tag}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="bg-white p-4 rounded-lg border">
-                  <p className="text-sm font-medium text-blue-800 mb-2">📋 具体操作步骤：</p>
-                  <p className="text-sm leading-relaxed text-gray-700">{suggestion.suggestion}</p>
-                </div>
-                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                  <p className="text-sm font-medium text-green-800 mb-2">💡 标准答案示例：</p>
-                  <p className="text-sm text-green-700 leading-relaxed italic">"{suggestion.example}"</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </TabsContent>
 
         <TabsContent value="core" className="space-y-4">
           <Card>
