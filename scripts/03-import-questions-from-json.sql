@@ -3,7 +3,7 @@
 
 -- 插入新的题目数据
 -- HR面试题目 (stage_id = 1)
-INSERT INTO interview_questions (question_text, category_id, stage_id, difficulty_level, expected_answer, keywords, source_reference) VALUES
+INSERT INTO interview_questions (stage_id, question_text, analysis, source_reference, expected_answer) VALUES
 
 -- 1.1 自我介绍与职业动机
 ('请用3分钟进行自我介绍，重点说明你为什么适合AI产品经理岗位。', 1, 1, 'medium', 
