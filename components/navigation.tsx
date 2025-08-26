@@ -21,18 +21,112 @@ interface NavigationProps {
   currentPage?: string
 }
 
+interface Profile {
+  id: string
+  full_name?: string
+  avatar_url?: string
+  username?: string
+}
+
 export default function Navigation({ currentPage }: NavigationProps) {
   const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
   const router = useRouter()
   
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url, username')
+        .eq('id', userId)
+        .single()
+      
+      if (error) {
+        console.error('Error fetching profile:', error)
+        return
+      }
+      
+      setProfile(data)
+    } catch (error) {
+      console.error('Error fetching profile:', error)
+    }
+  }
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
+    // 初始获取session
+    const initSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        await fetchProfile(session.user.id);
+      }
+    };
+    initSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log(`Navigation: auth state change detected. Event: ${event}`, session?.user?.email);
+      if (event === 'SIGNED_IN' && session?.user) {
+        setUser(session.user);
+        await fetchProfile(session.user.id);
+        const pendingSession = localStorage.getItem('pendingPracticeSession');
+        if (pendingSession) {
+          try {
+            const sessionData = JSON.parse(pendingSession);
+            sessionData.user_id = session.user.id;
+            const response = await fetch('/api/practice-sessions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(sessionData),
+            });
+            if (response.ok) {
+              localStorage.removeItem('pendingPracticeSession');
+              console.log('Pending practice session saved successfully');
+            }
+          } catch (error) {
+            console.error('Error saving pending session:', error);
+          }
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setProfile(null);
+      }
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, []);
+
+  // 单独的useEffect来处理profiles表的监听
+  useEffect(() => {
+    let profileSubscription: any = null
+    if (user) {
+      profileSubscription = supabase
+        .channel(`profile-changes-${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'profiles',
+            filter: `id=eq.${user.id}`
+          },
+          (payload) => {
+            console.log('Profile updated:', payload.new)
+            setProfile(payload.new as Profile)
+          }
+        )
+        .subscribe()
     }
-    getUser()
-  }, [])
+
+    return () => {
+      if (profileSubscription) {
+        profileSubscription.unsubscribe()
+      }
+    }
+  }, [user?.id])
 
   const handleLogout = async () => {
     try {
@@ -104,16 +198,16 @@ export default function Navigation({ currentPage }: NavigationProps) {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.user_metadata?.avatar_url} alt={user.email || ''} />
+                      <AvatarImage src={profile?.avatar_url || ''} alt={user.email || ''} />
                       <AvatarFallback>
-                        {user.email?.charAt(0).toUpperCase() || 'U'}
+                        {profile?.full_name?.charAt(0).toUpperCase() || profile?.username?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <div className="flex flex-col space-y-1 p-2">
-                    <p className="text-sm font-medium leading-none">{user.user_metadata?.full_name || '用户'}</p>
+                    <p className="text-sm font-medium leading-none">{profile?.full_name || profile?.username || '用户'}</p>
                     <p className="text-xs leading-none text-muted-foreground">
                       {user.email}
                     </p>

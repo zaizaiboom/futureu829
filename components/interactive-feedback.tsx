@@ -4,8 +4,11 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { TrendingUp, Target, Lightbulb, Star, ArrowRight, CheckCircle, AlertCircle, Zap, Brain, BarChart3, ThumbsUp, ThumbsDown, MessageSquareQuestion } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { AggregatedReport, IndividualEvaluationResponse } from "@/types/evaluation"
+import { supabase } from "@/lib/supabase/client"
+import { User } from "@supabase/supabase-js"
+import Link from "next/link"
 
 // 定义组件接受的反馈数据类型
 type FeedbackData = AggregatedReport | IndividualEvaluationResponse
@@ -28,6 +31,23 @@ const isIndividualEvaluation = (data: FeedbackData): data is IndividualEvaluatio
 export default function InteractiveFeedback({ feedback, onRetry, onNextQuestion }: InteractiveFeedbackProps) {
   const [activeTab, setActiveTab] = useState<"summary" | "strengths" | "improvements">("summary")
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
+  const [user, setUser] = useState<User | null>(null)
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+    }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+    
+    getUser()
+
+    return () => {
+      subscription?.unsubscribe()
+    }
+  }, [])
 
   const toggleExpanded = (key: string) => {
     const newExpanded = new Set(expandedItems)
@@ -310,6 +330,34 @@ export default function InteractiveFeedback({ feedback, onRetry, onNextQuestion 
             <span>继续下一题</span>
             <ArrowRight className="w-4 h-4" />
           </Button>
+        )}
+        
+        {user ? (
+          <Button
+            variant="outline"
+            onClick={() => window.location.href = '/learning-report'}
+            className="flex items-center space-x-2 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 hover:bg-gradient-to-r hover:from-green-100 hover:to-emerald-100 text-green-700 hover:text-green-800"
+          >
+            <BarChart3 className="w-4 h-4" />
+            <span>查看完整学习报告</span>
+          </Button>
+        ) : (
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-md">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <AlertCircle className="h-5 w-5 text-yellow-500" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-yellow-800">
+                  想查看详细的学习报告并长期跟踪表现？{' '}
+                  <Link href="/auth/login" className="font-medium underline text-yellow-900 hover:text-yellow-950">
+                    登录
+                  </Link>
+                  {' '}后即可解锁全部功能。
+                </p>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

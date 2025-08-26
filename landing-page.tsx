@@ -26,19 +26,40 @@ export default function LandingPage() {
   useEffect(() => {
     setIsLoading(true);
     
+    // 检查当前用户状态
+    const checkCurrentUser = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const userState = { id: session.user.id, email: session.user.email || "" };
+          console.log("✅ Landing Page: Current user found:", userState);
+          setUser(userState);
+        } else {
+          console.log("❌ Landing Page: No current user");
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("Error checking current user:", error);
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    checkCurrentUser();
+    
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("🔄 Auth state changed:", event, "User:", session?.user?.email);
-      if (session?.user) {
+      console.log("🔄 Auth state changed on Landing Page:", event, "User:", session?.user?.email);
+      if (event === 'SIGNED_IN' && session?.user) {
         const userState = { id: session.user.id, email: session.user.email || "" };
-        console.log("✅ Auth listener setting user state:", userState);
+        console.log("✅ Landing Page: User signed in, setting user state:", userState);
         setUser(userState);
-      } else {
-        console.log("❌ Auth listener clearing user state");
+      } else if (event === 'SIGNED_OUT') {
+        console.log("❌ Landing Page: User signed out, clearing user state");
         setUser(null);
       }
-      setIsLoading(false);
     });
 
     return () => {
@@ -123,7 +144,13 @@ export default function LandingPage() {
   const handleLogin = async (email: string, password: string) => {
     try {
       console.log("🔐 Starting login process for:", email);
-      await signIn(email, password);
+      const res = await signIn(email, password);
+      // 如果服务端登录成功，拿到会话并在客户端同步，以触发 onAuthStateChange
+      const accessToken = (res as any)?.session?.access_token
+      const refreshToken = (res as any)?.session?.refresh_token
+      if (accessToken && refreshToken) {
+        await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+      }
       setShowAuthModal(false);
       console.log("✅ Login request sent. Auth state change will handle the rest.");
     } catch (error: any) {
@@ -326,7 +353,7 @@ export default function LandingPage() {
                   <Button
                     variant="outline"
                     onClick={() => setShowAuthModal(true)}
-                    className="flex items-center space-x-2 bg-white/80 backdrop-blur-sm"
+                    className="flex items-center space-x-2 bg白/80 backdrop-blur-sm"
                   >
                     <LogIn className="w-4 h-4" />
                     <span>登录</span>
@@ -386,7 +413,7 @@ export default function LandingPage() {
                         >
                           <IconComponent className="w-8 h-8 text-white" />
                         </div>
-                        <Badge className={`mb-4 ${module.bgColor} ${module.textColor} border-0`}>
+                        <Badge className={`${module.bgColor} ${module.textColor} border-0`}>
                           {module.subtitle}
                         </Badge>
                         <h3 className="text-xl font-bold text-gray-900 mb-3">{module.title}</h3>
@@ -403,7 +430,7 @@ export default function LandingPage() {
               <div className="text-center mt-12">
                 <Button
                   size="lg"
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+                  className="bg-gradient-to-r from-blue-600 to紫-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
                   onClick={() => setCurrentView("modules")}
                 >
                   开始您的FutureU学习之旅

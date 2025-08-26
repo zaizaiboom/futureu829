@@ -1,50 +1,45 @@
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
-import LoginForm from "@/components/login-form"
+import { createClient } from '@/lib/supabase/server'
+import LoginForm from '@/components/login-form'
+import { redirect } from 'next/navigation'
 
 export const dynamic = "force-dynamic"
 
-export default async function LoginPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>
-}) {
-  // 如果Supabase未配置，显示设置消息
-  if (!isSupabaseConfigured) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <h1 className="text-2xl font-bold mb-4">请连接Supabase以开始使用</h1>
-      </div>
-    )
-  }
+interface LoginPageProps {
+  searchParams: Promise<{
+    redirectTo?: string
+    error?: string
+  }>
+}
 
-  const { error } = await searchParams
-  let errorMessage = ''
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const { redirectTo, error } = await searchParams
   
-  if (error) {
-    switch (error) {
-      case 'callback_error':
-        errorMessage = '登录回调出现错误，请重试'
-        break
-      case 'exchange_error':
-        errorMessage = '登录验证失败，请重试'
-        break
-      case 'unexpected_error':
-        errorMessage = '登录过程中出现意外错误，请重试'
-        break
-      default:
-        errorMessage = '登录出现错误，请重试'
-    }
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (user) {
+    redirect(redirectTo || '/learning-report')
   }
-
+  
+  let errorMessage = ''
+  if (error === 'invalid_credentials') {
+    errorMessage = '邮箱或密码错误，请重试。'
+  } else if (error === 'email_not_confirmed') {
+    errorMessage = '请先验证您的邮箱地址。'
+  } else if (error) {
+    errorMessage = '登录失败，请重试。'
+  }
+  
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
-      {errorMessage && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-red-600 text-sm">{errorMessage}</p>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="max-w-md w-full space-y-8">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            登录到您的账户
+          </h2>
         </div>
-      )}
-      <LoginForm />
+        <LoginForm redirectTo={redirectTo} error={errorMessage} />
+      </div>
     </div>
   )
 }

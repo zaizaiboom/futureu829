@@ -1,13 +1,10 @@
 "use client"
 
-import { useActionState } from "react"
 import { useFormStatus } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Loader2 } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useEffect } from "react"
 import { signIn } from "@/lib/actions"
 
 function SubmitButton() {
@@ -31,17 +28,7 @@ function SubmitButton() {
   )
 }
 
-export default function LoginForm() {
-  const router = useRouter()
-  const [state, formAction] = useActionState(signIn, null)
-
-  // 登录成功后重定向
-  useEffect(() => {
-    if (state?.success) {
-      router.push("/")
-    }
-  }, [state, router])
-
+export default function LoginForm({ redirectTo }: { redirectTo?: string }) {
   return (
     <div className="w-full max-w-md space-y-8">
       <div className="space-y-2 text-center">
@@ -49,10 +36,8 @@ export default function LoginForm() {
         <p className="text-lg text-muted-foreground">登录您的账户</p>
       </div>
 
-      <form action={formAction} className="space-y-6">
-        {state?.error && (
-          <div className="bg-red-500/10 border border-red-500/50 text-red-700 px-4 py-3 rounded">{state.error}</div>
-        )}
+      <form action={signIn} className="space-y-6">
+        <input type="hidden" name="redirectTo" value={redirectTo} />
 
         <div className="space-y-4">
           <div className="space-y-2">

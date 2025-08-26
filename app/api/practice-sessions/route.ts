@@ -3,26 +3,47 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
-    const { stage_type, questions_and_answers, evaluation_score, ai_feedback } = await request.json()
+    const requestBody = await request.json()
+    const { stage_type, questions_and_answers, evaluation_score, ai_feedback } = requestBody
 
     console.log('📝 [API] 保存练习记录请求:', {
       stage_type,
       questionCount: questions_and_answers?.length,
-      evaluation_score
+      evaluation_score,
+      fullRequestBody: requestBody
     })
+
+    // 验证必需的字段
+    if (!stage_type) {
+      console.error('❌ [API] 缺少 stage_type 字段')
+      return NextResponse.json(
+        { error: '缺少必需的字段: stage_type' },
+        { status: 400 }
+      )
+    }
+
+    if (!questions_and_answers || !Array.isArray(questions_and_answers)) {
+      console.error('❌ [API] questions_and_answers 字段无效或缺失')
+      return NextResponse.json(
+        { error: '缺少必需的字段: questions_and_answers，或格式不正确' },
+        { status: 400 }
+      )
+    }
 
     const supabase = await createClient()
     
-    // 获取当前用户
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    // 获取当前会话和用户
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
     
-    if (userError || !user) {
-      console.error('❌ [API] 用户认证失败:', userError)
+    if (sessionError || !session?.user) {
+      console.error('❌ [API] 用户认证失败:', sessionError)
       return NextResponse.json(
         { error: '用户认证失败' },
         { status: 401 }
       )
     }
+    
+    const user = session.user
 
     // 直接使用阶段ID映射，避免数据库查询问题
     const stageIdMapping: Record<string, number> = {
@@ -158,15 +179,17 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
     
-    // 获取当前用户
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    // 获取当前会话和用户
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
     
-    if (userError || !user) {
+    if (sessionError || !session?.user) {
       return NextResponse.json(
         { error: '用户认证失败' },
         { status: 401 }
       )
     }
+    
+    const user = session.user
 
     // 获取用户的练习记录
     const { data: sessions, error: sessionsError } = await supabase

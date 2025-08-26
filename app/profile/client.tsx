@@ -114,7 +114,8 @@ export function ProfileClient({ user, profileData, domainsData, skillsData }: Pr
           linkedin_url: profile.linkedin_url,
           portfolio_url: profile.portfolio_url,
           resume_url: profile.resume_url,
-          membership_status: profile.membership_status
+          membership_status: profile.membership_status,
+          avatar_url: profile.avatar_url
         })
 
       if (error) throw error
@@ -124,6 +125,58 @@ export function ProfileClient({ user, profileData, domainsData, skillsData }: Pr
       toast.error('保存失败，请重试')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !user) return
+
+    // 检查文件类型
+    if (!file.type.startsWith('image/')) {
+      toast.error('请选择图片文件')
+      return
+    }
+
+    // 检查文件大小 (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('图片大小不能超过5MB')
+      return
+    }
+
+    try {
+      // 生成唯一文件名
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`
+      const filePath = `avatars/${fileName}`
+
+      // 上传到 Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      // 获取公共URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath)
+
+      // 更新profile状态
+      setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : prev)
+
+      // 立即保存到数据库
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id)
+
+      if (updateError) throw updateError
+
+      toast.success('头像上传成功！')
+    } catch (error) {
+      console.error('Error uploading avatar:', error)
+      toast.error('头像上传失败，请重试')
     }
   }
 
@@ -249,10 +302,18 @@ export function ProfileClient({ user, profileData, domainsData, skillsData }: Pr
                       {profile.full_name?.charAt(0) || profile.username?.charAt(0) || 'U'}
                     </AvatarFallback>
                   </Avatar>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarUpload}
+                    className="hidden"
+                    id="avatar-upload"
+                  />
                   <Button
                     size="sm"
                     variant="outline"
-                    className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0 bg-white shadow-md"
+                    className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0 bg-white shadow-md hover:bg-gray-50"
+                    onClick={() => document.getElementById('avatar-upload')?.click()}
                   >
                     <Camera className="h-4 w-4" />
                   </Button>

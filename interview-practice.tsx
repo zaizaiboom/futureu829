@@ -30,9 +30,12 @@ import {
   RotateCcw,
   Settings,
   Check,
+  FileText,
 } from "lucide-react"
 import { getRandomQuestions, getQuestionCount, type Question, getQuestionStats } from "@/lib/questions-service"
 import type { AggregatedReport, IndividualEvaluationResponse } from "@/types/evaluation"
+import { supabase } from "@/lib/supabase/client"
+import LoginPrompt from "@/components/LoginPrompt"
 
 // TypeScript类型定义
 declare global {
@@ -129,6 +132,7 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [answers, setAnswers] = useState<string[]>([])
   const [currentAnswer, setCurrentAnswer] = useState("")
+  const [skippedQuestions, setSkippedQuestions] = useState<boolean[]>([]) // 跟踪跳过的题目
   const [timeLeft, setTimeLeft] = useState(0)
   const [feedback, setFeedback] = useState<EvaluationResult | null>(null)
   const [evaluationError, setEvaluationError] = useState<string | null>(null)
@@ -176,6 +180,10 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
   const [realTimeAudioLevel, setRealTimeAudioLevel] = useState(0)
   const [isMonitoringAudio, setIsMonitoringAudio] = useState(false)
   const [microphoneTestInProgress, setMicrophoneTestInProgress] = useState(false)
+  
+  // 用户登录状态
+  const [isUserLoggedIn, setIsUserLoggedIn] = useState<boolean | null>(null)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [availableAudioDevices, setAvailableAudioDevices] = useState<MediaDeviceInfo[]>([])
   const [selectedAudioDevice, setSelectedAudioDevice] = useState<string>('')
   const [currentPlayback, setCurrentPlayback] = useState<HTMLAudioElement | null>(null)
@@ -187,6 +195,10 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
   const [isPlayingAnswerAudio, setIsPlayingAnswerAudio] = useState<number | null>(null)
   const [currentAnswerRecorder, setCurrentAnswerRecorder] = useState<MediaRecorder | null>(null)
   const [currentAnswerStream, setCurrentAnswerStream] = useState<MediaStream | null>(null)
+
+  // 练习时长记录
+  const [practiceStartTime, setPracticeStartTime] = useState<Date | null>(null)
+  const [practiceEndTime, setPracticeEndTime] = useState<Date | null>(null)
 
   const currentStage = stageConfig[moduleType]
   const IconComponent = currentStage.icon
@@ -726,6 +738,28 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
     loadQuestions()
   }, [moduleType])
 
+  // 检查用户登录状态
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        if (error) {
+          console.error('检查登录状态失败:', error)
+          setIsUserLoggedIn(false)
+        } else {
+          setIsUserLoggedIn(session?.user !== null && session?.user !== undefined)
+        }
+      } catch (error) {
+        console.error('检查登录状态失败:', error)
+        setIsUserLoggedIn(false)
+      } finally {
+        setIsCheckingAuth(false)
+      }
+    }
+    
+    checkAuthStatus()
+  }, [])
+
   // 计时器
   useEffect(() => {
     let interval: NodeJS.Timeout
@@ -777,23 +811,59 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
     setCurrentQuestionIndex(0)
     setAnswers([])
     setCurrentAnswer("")
+    setSkippedQuestions(new Array(questions.length).fill(false)) // 初始化跳过状态
     setTimeLeft(300) // 5分钟每题
     setCurrentStep("answering")
     setFeedback(null)
     setEvaluationError(null)
     setStageProgress(0)
+    setPracticeStartTime(new Date()) // 记录练习开始时间
     console.log("🔄 [前端] 开始阶段练习:", currentStage.title, `共${questions.length}道题`)
+  }
+
+  // 跳过当前题目
+  const skipCurrentQuestion = () => {
+    // 停止所有音频播放
+    stopAllAudio()
+
+    const newAnswers = [...answers, ""] // 跳过的题目答案为空字符串
+    const newSkippedQuestions = [...skippedQuestions]
+    newSkippedQuestions[currentQuestionIndex] = true
+    
+    setAnswers(newAnswers)
+    setSkippedQuestions(newSkippedQuestions)
+    setCurrentAnswer("")
+    setStageProgress(((currentQuestionIndex + 1) / questions.length) * 100)
+
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex((prev) => prev + 1)
+      setTimeLeft(300)
+      console.log(`⏭️ [前端] 跳过第 ${currentQuestionIndex + 1} 题，进入第 ${currentQuestionIndex + 2} 题`)
+    } else {
+      console.log(`✅ [前端] 完成所有 ${questions.length} 道题目，开始评估`)
+      submitAllAnswers(newAnswers, newSkippedQuestions)
+    }
   }
 
   // 提交当前答案
   const submitCurrentAnswer = () => {
-    if (!currentAnswer.trim()) return
+    // 检查是否有文字答案或录音
+    const hasTextAnswer = currentAnswer.trim()
+    const hasRecording = answerRecordings[currentQuestionIndex]
+    
+    if (!hasTextAnswer && !hasRecording) {
+      setSpeechError('请提供文字答案或录音后再提交')
+      return
+    }
 
     // 停止所有音频播放
     stopAllAudio()
 
-    const newAnswers = [...answers, currentAnswer]
+    // 如果没有文字答案但有录音，使用提示文本
+    const answerToSubmit = hasTextAnswer ? currentAnswer : '[用户提供了语音回答，但语音识别未成功转换为文字]'
+    const newAnswers = [...answers, answerToSubmit]
     setAnswers(newAnswers)
+    
     setCurrentAnswer("")
     setStageProgress(((currentQuestionIndex + 1) / questions.length) * 100)
 
@@ -803,13 +873,20 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
       console.log(`➡️ [前端] 进入第 ${currentQuestionIndex + 2} 题`)
     } else {
       console.log(`✅ [前端] 完成所有 ${questions.length} 道题目，开始评估`)
-      submitAllAnswers(newAnswers)
+      submitAllAnswers(newAnswers, skippedQuestions)
     }
   }
 
   // 保存练习记录到数据库
   const savePracticeSession = async (evaluationResult: AggregatedReport, answers: string[]) => {
     try {
+      // 检查用户是否已登录
+      const { data: { session }, error: authError } = await supabase.auth.getSession()
+      if (authError || !session?.user) {
+        console.log("💾 [前端] 用户未登录，跳过保存练习记录")
+        return
+      }
+
       const levelScoreMap: { [key: string]: number } = {
         "优秀表现": 90,
         "良好表现": 75,
@@ -839,6 +916,7 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify(practiceData),
       })
@@ -855,82 +933,95 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
     }
   }
 
-  // 提交所有答案进行评估
-  const submitAllAnswers = async (allAnswers: string[]) => {
-    console.log("🎯 [前端] 提交阶段答案:", {
-      stage: moduleType,
-      questionCount: questions.length,
-      answerCount: allAnswers.length,
-    })
-
-    setCurrentStep("analyzing")
-    setIsEvaluating(true)
-    setEvaluationError(null)
-
-    let progress = 0
-    const progressInterval = setInterval(() => {
-      progress += Math.random() * 15
-      if (progress > 90) progress = 90
-      setStageProgress(progress)
-    }, 200)
+  // 单题评估 - 流水线式异步评估
+  const evaluateSingleQuestion = async (questionIndex: number, question: string, answer: string, sessionId: string) => {
+    // 只有在完全没有答案时才跳过评估
+    if (!answer || answer.trim() === '') {
+      console.log(`⏭️ [前端] 跳过第${questionIndex + 1}题的评估 - 答案为空`)
+      return
+    }
 
     try {
+      console.log(`🚀 [前端] 开始第${questionIndex + 1}题的异步评估`)
+      
       const requestData = {
+        question: question,
+        userAnswer: answer,
         stageType: moduleType,
-        questions: questions.map((q) => q.question_text),
-        answers: allAnswers,
+        category: moduleType,
+        difficulty: "中等",
+        keyPoints: [
+          "理解问题核心",
+          "展现专业思维",
+          "提供具体可行的解决方案"
+        ],
+        questionAnalysis: "本题的核心考点分析",
+        answerFramework: "高分答案的建议框架",
+        questionIndex: questionIndex,
         stageTitle: currentStage.title,
-        async: false,
+        sessionId: sessionId
       }
 
-      console.log("📤 [前端] 发送评估请求:", requestData)
-
-      const response = await fetch("/api/evaluate-question-set", {
+      // 发后即忘的异步调用
+      fetch("/api/evaluate-single", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(requestData),
+      }).then(response => {
+        if (response.ok) {
+          console.log(`✅ [前端] 第${questionIndex + 1}题评估请求已发送`)
+        } else {
+          console.error(`❌ [前端] 第${questionIndex + 1}题评估请求失败`)
+        }
+      }).catch(error => {
+        console.error(`💥 [前端] 第${questionIndex + 1}题评估请求异常:`, error)
+      })
+      
+    } catch (error) {
+      console.error(`💥 [前端] 第${questionIndex + 1}题评估失败:`, error)
+    }
+  }
+
+  // 提交所有答案并跳转到渐进式评估报告
+  const submitAllAnswers = async (allAnswers: string[], skippedQuestionsArray: boolean[] = []) => {
+    setIsEvaluating(true)
+    setEvaluationError(null)
+    setCurrentStep("analyzing")
+
+    try {
+      const response = await fetch("/api/evaluate-question-set", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          questions: questions.map(q => q.question_text),
+          answers: allAnswers,
+          stage: moduleType,
+        }),
       })
 
-      const responseData = await response.json()
-      clearInterval(progressInterval)
-      setStageProgress(100)
-
       if (!response.ok) {
-        throw new Error(responseData.message || responseData.error || "评估服务暂时不可用")
+        const errorData = await response.json()
+        throw new Error(errorData.error || "评估失败")
       }
 
-      if (isAggregatedReport(responseData)) {
-        const aggregatedReport: AggregatedReport = responseData
-        setFeedback(aggregatedReport)
-        setCurrentStep("result")
-        
-        savePracticeSession(aggregatedReport, allAnswers)
-        
-        console.log("✅ [前端] 新版评估完成:", {
-          evaluationId: aggregatedReport.evaluationId,
-          overallLevel: aggregatedReport.overallSummary.overallLevel,
-          individualCount: aggregatedReport.individualEvaluations.length
-        })
+      const result = await response.json()
+      if (isAggregatedReport(result)) {
+        setFeedback(result)
+        savePracticeSession(result, allAnswers) // 保存练习记录
       } else {
-        console.error("评估结果格式错误", responseData);
-        throw new Error("收到的评估结果格式不正确。")
+        throw new Error("返回的评估数据格式不正确")
       }
-    } catch (error) {
-      clearInterval(progressInterval)
+    } catch (error: any) {
       console.error("💥 [前端] 评估失败:", error)
-      setEvaluationError(error instanceof Error ? error.message : "评估失败，请稍后重试")
-
-      const fallbackResult = generateFallbackEvaluation()
-      setFeedback(fallbackResult)
-      setCurrentStep("result")
-      
-      savePracticeSession(fallbackResult, allAnswers)
-      
-      console.log("🔄 [前端] 使用备用评估结果")
+      setEvaluationError(error.message || "评估过程中发生未知错误")
+      setFeedback(generateFallbackEvaluation()) // 生成备用评估结果
     } finally {
       setIsEvaluating(false)
+      setCurrentStep("result")
     }
   }
 
@@ -1016,13 +1107,62 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('语音识别错误:', event.error)
-        setSpeechError(`语音识别错误: ${event.error}`)
+        
+        // 提供更友好的错误提示
+        let errorMessage = ''
+        switch (event.error) {
+          case 'not-allowed':
+            errorMessage = '麦克风权限被拒绝，请在浏览器设置中允许麦克风访问'
+            break
+          case 'no-speech':
+            errorMessage = '未检测到语音，请重新尝试'
+            // 对于no-speech错误，不显示错误信息，而是自动重试
+            if (isRecording) {
+              setTimeout(() => {
+                try {
+                  recognition.start()
+                } catch (e) {
+                  console.log('自动重试语音识别失败:', e)
+                }
+              }, 1000)
+              return
+            }
+            break
+          case 'audio-capture':
+            errorMessage = '麦克风无法正常工作，请检查设备连接'
+            break
+          case 'network':
+            errorMessage = '网络连接问题，请检查网络后重试'
+            break
+          case 'aborted':
+            // 用户主动停止，不显示错误
+            return
+          default:
+            errorMessage = `语音识别错误: ${event.error}`
+        }
+        
+        setSpeechError(errorMessage)
         setIsRecording(false)
       }
 
       recognition.onend = () => {
-        setIsRecording(false)
-        setInterimTranscript('')
+        console.log('语音识别结束，当前录音状态:', isRecording)
+        
+        // 如果用户还在录音状态，自动重启语音识别
+        if (isRecording) {
+          setTimeout(() => {
+            try {
+              recognition.start()
+              console.log('自动重启语音识别')
+            } catch (error) {
+              console.log('重启语音识别失败:', error)
+              setIsRecording(false)
+              setInterimTranscript('')
+            }
+          }, 100)
+        } else {
+          setInterimTranscript('')
+        }
       }
 
       setRecognition(recognition)
@@ -1071,6 +1211,16 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
         setCurrentAnswerStream(null)
       }
     } else {
+      // 添加状态锁，防止重复启动录音
+      const isStartingRecording = window.isStartingRecording
+      if (isStartingRecording) {
+        console.log('录音启动中，请稍候...')
+        return
+      }
+      
+      // 设置状态锁
+      window.isStartingRecording = true
+      
       try {
         setSpeechError(null)
         setInterimTranscript('')
@@ -1140,7 +1290,28 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
         
       } catch (error) {
         console.error('启动录音失败:', error)
-        setSpeechError('无法启动录音功能，请检查麦克风权限')
+        
+        // 提供更详细的错误信息
+        let errorMessage = ''
+        if (error.name === 'NotAllowedError') {
+          errorMessage = '麦克风权限被拒绝。请点击地址栏的麦克风图标，选择"允许"，然后刷新页面重试。'
+        } else if (error.name === 'NotFoundError') {
+          errorMessage = '未找到麦克风设备。请检查麦克风是否正确连接，或尝试重新插拔设备。'
+        } else if (error.name === 'NotReadableError') {
+          errorMessage = '麦克风被其他应用占用。请关闭其他使用麦克风的应用后重试。'
+        } else if (error.name === 'OverconstrainedError') {
+          errorMessage = '麦克风不支持所需的音频格式。请尝试使用其他麦克风设备。'
+        } else if (error.name === 'SecurityError') {
+          errorMessage = '安全限制阻止了麦克风访问。请确保网站使用HTTPS连接。'
+        } else {
+          errorMessage = `无法启动录音功能: ${error.message || error.name || '未知错误'}`
+        }
+        
+        setSpeechError(errorMessage)
+        setIsRecording(false)
+      } finally {
+        // 确保释放状态锁
+        window.isStartingRecording = false;
       }
     }
   }
@@ -1693,6 +1864,11 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium">
                     题目 {currentQuestionIndex + 1} / {questions.length}
+                    {skippedQuestions.filter(Boolean).length > 0 && (
+                      <span className="ml-2 text-xs text-gray-500">
+                        (已跳过 {skippedQuestions.filter(Boolean).length} 题)
+                      </span>
+                    )}
                   </span>
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4" />
@@ -1897,18 +2073,27 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
                   </div>
                 )}
                 
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <div className="text-sm text-gray-500">
                     已输入 {currentAnswer.length} 字符
                   </div>
-                  <Button 
-                    onClick={submitCurrentAnswer}
-                    disabled={!currentAnswer.trim()}
-                    className="flex items-center gap-2"
-                  >
-                    <Send className="h-4 w-4" />
-                    {currentQuestionIndex < questions.length - 1 ? "下一题" : "完成答题"}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={skipCurrentQuestion}
+                      variant="outline"
+                      className="flex items-center gap-2 text-gray-600 hover:text-gray-800"
+                    >
+                      ⏭️ 跳过此题
+                    </Button>
+                    <Button 
+                      onClick={submitCurrentAnswer}
+                      disabled={!currentAnswer.trim() && !answerRecordings[currentQuestionIndex]}
+                      className="flex items-center gap-2"
+                    >
+                      <Send className="h-4 w-4" />
+                      {currentQuestionIndex < questions.length - 1 ? "下一题" : "完成答题"}
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1995,6 +2180,32 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
                   </div>
                 )}
 
+                {/* 登录引导 */}
+                {!isCheckingAuth && !isUserLoggedIn && (
+                  <>
+                    {(() => {
+                      // 计算练习时长（分钟）
+                      const practiceDuration = practiceStartTime && practiceEndTime 
+                        ? Math.round((practiceEndTime.getTime() - practiceStartTime.getTime()) / (1000 * 60))
+                        : 0;
+                      
+                      const sessionData = {
+                        user_id: 'pending',
+                        module_type: moduleType,
+                        practice_duration: practiceDuration,
+                        created_at: new Date().toISOString(),
+                        questions: questions.map((q, index) => ({
+                          question_id: q.id,
+                          user_answer: answers[index] || '',
+                          ai_feedback: feedback?.individualEvaluations[index] || null
+                        }))
+                      };
+                      localStorage.setItem('pendingPracticeSession', JSON.stringify(sessionData));
+                    })()}
+                    <LoginPrompt />
+                  </>
+                )}
+
                 {/* 操作按钮 */}
                 <div className="flex gap-3">
                   <Button onClick={restartPractice} className="flex-1">
@@ -2005,6 +2216,12 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     返回选择
                   </Button>
+                  {isUserLoggedIn && (
+                    <Button onClick={() => window.location.href = '/learning-report'} className="flex-1 bg-green-600 hover:bg-green-700">
+                      <FileText className="h-4 w-4 mr-2" />
+                      查看完整报告
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

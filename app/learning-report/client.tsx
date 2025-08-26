@@ -92,6 +92,64 @@ export function LearningReportClient({ sessions, user }: { sessions: PracticeSes
   const [mostFrequentSuggestion, setMostFrequentSuggestion] = useState<string>('')
 
 
+  // 处理待处理的练习记录
+  useEffect(() => {
+    const pendingSession = localStorage.getItem('pendingPracticeSession')
+    if (pendingSession && user) {
+      const rawSessionData = JSON.parse(pendingSession)
+      console.log('📤 [LearningReport] 原始待处理数据:', rawSessionData)
+      
+      // 转换数据格式以匹配 API 期望的格式
+      const sessionData = {
+        stage_type: rawSessionData.module_type || rawSessionData.stage_type,
+        questions_and_answers: rawSessionData.questions || rawSessionData.questions_and_answers || [],
+        evaluation_score: rawSessionData.evaluation_score || 0,
+        ai_feedback: rawSessionData.ai_feedback || {}
+      }
+      
+      console.log('📤 [LearningReport] 转换后的数据:', sessionData)
+      
+      // 增加一个重试计数器，避免无限循环
+      const retryCount = parseInt(localStorage.getItem('sessionSyncRetryCount') || '0', 10)
+
+      if (retryCount > 3) {
+        console.error('练习记录同步失败次数过多，请联系支持')
+        localStorage.removeItem('sessionSyncRetryCount') // 清除重试计数器
+        return
+      }
+      
+      fetch('/api/practice-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sessionData),
+      })
+        .then(async (response) => {
+          if (response.ok) {
+            console.log('✅ [LearningReport] 练习记录同步成功')
+            localStorage.removeItem('pendingPracticeSession')
+            localStorage.removeItem('sessionSyncRetryCount') // 同步成功，清除计数器
+            // 刷新页面以加载最新数据
+            window.location.reload()
+          } else {
+            const errorData = await response.json()
+            console.error('❌ [LearningReport] 保存练习记录失败:', {
+              status: response.status,
+              error: errorData.error,
+              details: errorData.details,
+              sessionData: sessionData
+            })
+            // 增加重试计数
+            localStorage.setItem('sessionSyncRetryCount', (retryCount + 1).toString())
+          }
+        })
+        .catch((error) => {
+          console.error('保存练习记录时发生网络错误:', error)
+          // 增加重试计数
+          localStorage.setItem('sessionSyncRetryCount', (retryCount + 1).toString())
+        })
+    }
+  }, [user])
+
   useEffect(() => {
     if (sessions.length > 0) {
       processAnalyticsData()
