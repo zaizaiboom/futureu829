@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
-import LearningReportClient from './client'
+import { PracticeHistoryClient } from './client'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,15 +24,15 @@ interface PracticeSession {
   }
 }
 
-interface LearningReportData {
+interface PracticeHistoryData {
   user: any
   sessions: PracticeSession[]
   totalSessions: number
-  averageScore: number
-  improvementTrend: number
+  categories: string[]
+  stages: string[]
 }
 
-async function getLearningReportData(): Promise<LearningReportData | null> {
+async function getPracticeHistoryData(): Promise<PracticeHistoryData | null> {
   try {
     const supabase = await createClient()
     
@@ -55,7 +55,6 @@ async function getLearningReportData(): Promise<LearningReportData | null> {
       `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(50)
 
     if (sessionsError) {
       console.error('获取练习数据失败:', sessionsError)
@@ -63,52 +62,51 @@ async function getLearningReportData(): Promise<LearningReportData | null> {
         user,
         sessions: [],
         totalSessions: 0,
-        averageScore: 0,
-        improvementTrend: 0
+        categories: [],
+        stages: []
       }
     }
 
     const sessions = sessionsData || []
-    const totalSessions = sessions.length
-    const averageScore = totalSessions > 0 
-      ? sessions.reduce((sum, session) => sum + (session.overall_score || 0), 0) / totalSessions
-      : 0
-
-    // 计算进步趋势（最近5次与之前5次的平均分对比）
-    let improvementTrend = 0
-    if (totalSessions >= 10) {
-      const recent5 = sessions.slice(0, 5)
-      const previous5 = sessions.slice(5, 10)
-      const recentAvg = recent5.reduce((sum, s) => sum + (s.overall_score || 0), 0) / 5
-      const previousAvg = previous5.reduce((sum, s) => sum + (s.overall_score || 0), 0) / 5
-      improvementTrend = recentAvg - previousAvg
-    }
+    
+    // 提取唯一的分类和阶段
+    const categories = [...new Set(
+      sessions
+        .map(s => s.question_categories?.category_name)
+        .filter(Boolean)
+    )]
+    
+    const stages = [...new Set(
+      sessions
+        .map(s => s.interview_stages?.stage_name)
+        .filter(Boolean)
+    )]
 
     return {
       user,
       sessions,
-      totalSessions,
-      averageScore,
-      improvementTrend
+      totalSessions: sessions.length,
+      categories,
+      stages
     }
   } catch (error) {
-    console.error('获取学习报告数据时发生错误:', error)
+    console.error('获取练习记录数据时发生错误:', error)
     return null
   }
 }
 
-export default async function LearningReportPage() {
-  const data = await getLearningReportData()
+export default async function PracticeHistoryPage() {
+  const data = await getPracticeHistoryData()
   
   if (!data) {
-    redirect('/auth/login?redirectTo=/learning-report')
+    redirect('/auth/login?redirectTo=/practice-history')
   }
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">学习报告</h1>
-        <p className="text-gray-600">查看您的学习进度和表现分析</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">练习记录</h1>
+        <p className="text-gray-600">查看您的所有练习历史和详细表现</p>
       </div>
 
       <Suspense fallback={
@@ -117,15 +115,12 @@ export default async function LearningReportPage() {
           <span className="ml-2 text-gray-600">加载中...</span>
         </div>
       }>
-        <LearningReportClient 
-          initialData={{
-            sessions: data.sessions,
-            totalSessions: data.totalSessions,
-            averageScore: data.averageScore,
-            totalHighlights: 0,
-            totalDuration: data.sessions.reduce((sum, session) => sum + (session.practice_duration || 0), 0),
-            progressTrend: data.improvementTrend
-          }}
+        <PracticeHistoryClient 
+          user={data.user}
+          sessions={data.sessions}
+          totalSessions={data.totalSessions}
+          categories={data.categories}
+          stages={data.stages}
         />
       </Suspense>
     </div>

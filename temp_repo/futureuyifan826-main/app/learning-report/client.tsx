@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
-import dynamic from 'next/dynamic'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -12,19 +11,9 @@ import { CompetencyAssessment } from '@/components/competency-assessment'
 import { HighlightsImprovements } from '@/components/highlights-improvements'
 import { TaskList } from '@/components/task-list'
 import Navigation from '@/components/navigation'
-import '@/styles/learning-report.css'
 
-// Dynamically import Recharts components with SSR disabled
-const LineChart = dynamic(() => import('recharts').then(mod => mod.LineChart), { ssr: false });
-const Line = dynamic(() => import('recharts').then(mod => mod.Line), { ssr: false });
-const XAxis = dynamic(() => import('recharts').then(mod => mod.XAxis), { ssr: false });
-const YAxis = dynamic(() => import('recharts').then(mod => mod.YAxis), { ssr: false });
-const CartesianGrid = dynamic(() => import('recharts').then(mod => mod.CartesianGrid), { ssr: false });
-const Tooltip = dynamic(() => import('recharts').then(mod => mod.Tooltip), { ssr: false });
-const ResponsiveContainer = dynamic(() => import('recharts').then(mod => mod.ResponsiveContainer), { ssr: false });
-const PieChart = dynamic(() => import('recharts').then(mod => mod.PieChart), { ssr: false });
-const Pie = dynamic(() => import('recharts').then(mod => mod.Pie), { ssr: false });
-const Cell = dynamic(() => import('recharts').then(mod => mod.Cell), { ssr: false });
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import '@/styles/learning-report.css'
 
 interface PracticeSession {
   id: string
@@ -355,7 +344,7 @@ export default function LearningReportClient({ initialData }: LearningReportClie
                       <div className="flex-1">
                         <h4 className="font-medium text-green-900 mb-2">保持优势</h4>
                         <p className="text-sm text-green-800 leading-relaxed mb-3">
-                          您在多次练习中展现了稳定的表现，继续保持当前的学习节奏和方法。建议定期回顾练习记录，巩固已掌握的技能。
+                          您在多次练习中展现出了稳定的表现，继续保持当前的学习节奏和方法。建议定期回顾练习记录，巩固已掌握的技能。
                         </p>
 
                       </div>
