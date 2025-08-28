@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import Image from "next/image"
 import { 
   Home, 
   BarChart3, 
@@ -14,8 +15,7 @@ import {
   User as UserIcon,
   ChevronLeft,
   ChevronRight,
-  LogOut,
-  Brain
+  LogOut
 } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -137,15 +137,15 @@ export default function SidebarNavigation({
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
           {!isCollapsed && (
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <Brain className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h1 className="font-bold text-lg text-gray-900">FutureU</h1>
-                <p className="text-xs text-gray-500">AI面试训练</p>
-              </div>
-            </div>
+            <Link href="/" className="flex items-center space-x-2">
+              <Image
+                src="/logo.png"
+                alt="FutureU Logo"
+                width={140}
+                height={40}
+                className="object-contain"
+              />
+            </Link>
           )}
           {onToggleCollapse && (
             <Button
@@ -190,7 +190,7 @@ export default function SidebarNavigation({
             {!isCollapsed ? (
               <div className="space-y-3">
                 <div className="w-16 h-16 mx-auto bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                  <Brain className="w-8 h-8 text-white" />
+                  <UserIcon className="w-8 h-8 text-white" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900 text-sm">解锁全部功能</h3>
@@ -206,7 +206,7 @@ export default function SidebarNavigation({
               </div>
             ) : (
               <div className="w-10 h-10 mx-auto bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                <Brain className="w-5 h-5 text-white" />
+                <UserIcon className="w-5 h-5 text-white" />
               </div>
             )}
           </div>
