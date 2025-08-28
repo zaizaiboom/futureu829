@@ -19,7 +19,6 @@ CREATE TABLE IF NOT EXISTS public.practice_sessions (
     logic_score INTEGER CHECK (logic_score >= 0 AND logic_score <= 100),
     expression_score INTEGER CHECK (expression_score >= 0 AND expression_score <= 100),
     ai_feedback TEXT,
-    practice_duration INTEGER, -- 练习时长（秒）
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );

@@ -50,7 +50,6 @@ CREATE TABLE IF NOT EXISTS user_preferences (
     language TEXT DEFAULT 'zh-CN',
     timezone TEXT DEFAULT 'Asia/Shanghai',
     difficulty_level TEXT DEFAULT 'medium',
-    practice_duration INTEGER DEFAULT 30,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(user_id)

@@ -15,6 +15,7 @@ function InterviewPracticeContent() {
   const [moduleType, setModuleType] = useState("hr")
   const [showFocusMode, setShowFocusMode] = useState(false)
   const [focusType, setFocusType] = useState<string | null>(null)
+  const [showSuggestion, setShowSuggestion] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   
@@ -147,6 +148,7 @@ function InterviewPracticeContent() {
                     <Button 
                       onClick={() => {
                         setModuleType(config.recommendedModule as "hr" | "professional" | "final")
+                        setShowSuggestion(true)
                         handleStartFocusPractice()
                       }}
                       className={`w-full bg-${config.color}-600 hover:bg-${config.color}-700`}
@@ -167,6 +169,8 @@ function InterviewPracticeContent() {
     <InterviewPractice 
       moduleType={moduleType} 
       onBack={handleBack} 
+      showSuggestion={showSuggestion}
+      setShowSuggestion={setShowSuggestion}
     />
   )
 }

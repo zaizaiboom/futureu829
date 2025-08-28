@@ -133,7 +133,7 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
   const [answers, setAnswers] = useState<string[]>([])
   const [currentAnswer, setCurrentAnswer] = useState("")
   const [skippedQuestions, setSkippedQuestions] = useState<boolean[]>([]) // 跟踪跳过的题目
-  const [timeLeft, setTimeLeft] = useState(0)
+  
   const [feedback, setFeedback] = useState<EvaluationResult | null>(null)
   const [evaluationError, setEvaluationError] = useState<string | null>(null)
   const [stageProgress, setStageProgress] = useState(0)
@@ -198,7 +198,21 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
 
   // 练习时长记录
   const [practiceStartTime, setPracticeStartTime] = useState<Date | null>(null)
-  const [practiceEndTime, setPracticeEndTime] = useState<Date | null>(null)
+  
+  // 答题建议显示状态
+  const [showSuggestion, setShowSuggestion] = useState(false)
+  
+  // 答题时间限制
+  const [timeLeft, setTimeLeft] = useState(0)
+
+  useEffect(() => {
+    if (currentStep === "answering" && questions.length > 0) {
+      const currentQuestion = questions[currentQuestionIndex]
+      if (currentQuestion) {
+        speakQuestion(currentQuestion.question_text)
+      }
+    }
+  }, [currentQuestionIndex, questions, currentStep])
 
   const currentStage = stageConfig[moduleType]
   const IconComponent = currentStage.icon
@@ -760,26 +774,9 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
     checkAuthStatus()
   }, [])
 
-  // 计时器
-  useEffect(() => {
-    let interval: NodeJS.Timeout
-    if (currentStep === "answering" && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft((prev) => prev - 1)
-      }, 1000)
-    }
 
-    return () => {
-      if (interval) clearInterval(interval)
-    }
-  }, [currentStep, timeLeft])
 
-  // 格式化时间
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, "0")}`
-  }
+
 
   // 开始练习
   const startPractice = () => {
@@ -799,7 +796,6 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
     setCurrentQuestionIndex(0)
     setAnswers([])
     setCurrentAnswer("")
-    setTimeLeft(300) // 5分钟每题
     setCurrentStep("answering")
     setFeedback(null)
     setEvaluationError(null)
@@ -837,7 +833,6 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
 
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex((prev) => prev + 1)
-      setTimeLeft(300)
       console.log(`⏭️ [前端] 跳过第 ${currentQuestionIndex + 1} 题，进入第 ${currentQuestionIndex + 2} 题`)
     } else {
       console.log(`✅ [前端] 完成所有 ${questions.length} 道题目，开始评估`)
@@ -869,7 +864,6 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
 
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex((prev) => prev + 1)
-      setTimeLeft(300)
       console.log(`➡️ [前端] 进入第 ${currentQuestionIndex + 2} 题`)
     } else {
       console.log(`✅ [前端] 完成所有 ${questions.length} 道题目，开始评估`)
@@ -1870,14 +1864,7 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
                       </span>
                     )}
                   </span>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    <span className={`text-sm font-medium ${
-                      timeLeft < 60 ? "text-red-600" : "text-gray-600"
-                    }`}>
-                      {formatTime(timeLeft)}
-                    </span>
-                  </div>
+
                 </div>
                 <Progress value={stageProgress} className="h-2" />
               </CardContent>
@@ -1913,9 +1900,9 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setShowSpeechSettings(!showSpeechSettings)}
+                      onClick={() => setShowSuggestion(!showSuggestion)}
                     >
-                      <Settings className="h-4 w-4" />
+                      <Lightbulb className="h-4 w-4" />
                     </Button>
                   </div>
                 </CardTitle>
@@ -1987,6 +1974,19 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
                 )}
               </CardHeader>
               <CardContent className="space-y-4">
+                {showSuggestion && questions[currentQuestionIndex]?.answer_suggestion && (
+                  <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                    <div className="flex items-start gap-3">
+                      <Lightbulb className="h-5 w-5 text-yellow-600 mt-1" />
+                      <div>
+                        <h4 className="font-semibold text-yellow-800">答题建议</h4>
+                        <p className="text-sm text-yellow-700 mt-1">
+                          {questions[currentQuestionIndex].answer_suggestion}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="relative">
                   <Textarea
                     placeholder="请输入您的答案，或点击麦克风按钮使用语音输入..."
@@ -2108,8 +2108,12 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
                 <Brain className="h-12 w-12 animate-pulse mx-auto mb-4 text-blue-600" />
                 <h3 className="text-xl font-semibold mb-2">AI正在分析您的回答</h3>
                 <p className="text-gray-600 mb-6">请稍候，我们正在为您生成详细的评估报告...</p>
-                <Progress value={stageProgress} className="mb-4" />
-                <div className="text-sm text-gray-500">{Math.round(stageProgress)}% 完成</div>
+                <div className="flex items-center justify-center space-x-2 my-4">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+                  <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                </div>
+                <p className="text-sm text-gray-500">这大约需要一分钟，请耐心等待。</p>
                 {evaluationError && (
                   <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                     <p className="text-red-600 text-sm">{evaluationError}</p>
@@ -2184,15 +2188,9 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
                 {!isCheckingAuth && !isUserLoggedIn && (
                   <>
                     {(() => {
-                      // 计算练习时长（分钟）
-                      const practiceDuration = practiceStartTime && practiceEndTime 
-                        ? Math.round((practiceEndTime.getTime() - practiceStartTime.getTime()) / (1000 * 60))
-                        : 0;
-                      
                       const sessionData = {
                         user_id: 'pending',
                         module_type: moduleType,
-                        practice_duration: practiceDuration,
                         created_at: new Date().toISOString(),
                         questions: questions.map((q, index) => ({
                           question_id: q.id,

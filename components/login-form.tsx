@@ -1,11 +1,14 @@
 "use client"
 
 import { useFormStatus } from "react-dom"
+import { useActionState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Loader2 } from "lucide-react"
 import Link from "next/link"
 import { signIn } from "@/lib/actions"
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 
 function SubmitButton() {
   const { pending } = useFormStatus()
@@ -29,6 +32,20 @@ function SubmitButton() {
 }
 
 export default function LoginForm({ redirectTo }: { redirectTo?: string }) {
+  const router = useRouter()
+  const [state, formAction] = useActionState(signIn, null)
+
+  useEffect(() => {
+    if (state?.success) {
+      router.push(state.redirectTo || '/learning-report')
+      router.refresh()
+    }
+    if (state?.error) {
+      // You can handle the error display here, e.g., show a toast notification
+      console.error("Login failed:", state.error)
+    }
+  }, [state, router])
+
   return (
     <div className="w-full max-w-md space-y-8">
       <div className="space-y-2 text-center">
@@ -36,7 +53,7 @@ export default function LoginForm({ redirectTo }: { redirectTo?: string }) {
         <p className="text-lg text-muted-foreground">登录您的账户</p>
       </div>
 
-      <form action={signIn} className="space-y-6">
+      <form action={formAction} className="space-y-6">
         <input type="hidden" name="redirectTo" value={redirectTo} />
 
         <div className="space-y-4">
@@ -60,6 +77,13 @@ export default function LoginForm({ redirectTo }: { redirectTo?: string }) {
             <Input id="password" name="password" type="password" required className="bg-background border-input" />
           </div>
         </div>
+
+        {state?.error === 'invalid_credentials' && (
+          <p className="text-sm text-red-500">邮箱或密码错误，请重试。</p>
+        )}
+        {state?.error === 'unknown_error' && (
+          <p className="text-sm text-red-500">发生未知错误，请稍后重试。</p>
+        )}
 
         <SubmitButton />
 

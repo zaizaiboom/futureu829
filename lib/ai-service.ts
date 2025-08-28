@@ -17,7 +17,7 @@ class AIEvaluationService {
       model: "deepseek-ai/DeepSeek-V3", 
       temperature: 0.3, // 稍微提高温度，以增加反馈的趣味性和创造性
       maxTokens: 3000,
-      timeout: 45000 // 适当延长超时，以应对更复杂的评估任务
+      timeout: 90000 // 适当延长超时，以应对更复杂的评估任务
     }
     
     if (!this.config.apiKey) {
@@ -100,6 +100,105 @@ class AIEvaluationService {
  }
  `
    }
+
+  async generateSuggestions(competencyData: CompetencyData[]): Promise<any> {
+    const prompt = this.buildSuggestionPrompt(competencyData);
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+
+      const response = await fetch(this.config.apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.config.apiKey}` },
+        body: JSON.stringify({
+          model: this.config.model,
+          messages: [
+            {
+              role: "system",
+              content: "你是一位专业的AI职业发展教练。你的任务是严格遵循用户提供的框架和JSON格式要求，生成个性化的成长建议。确保输出是纯净的、可被程序直接解析的JSON对象。",
+            },
+            { role: "user", content: prompt },
+          ],
+          temperature: this.config.temperature,
+          max_tokens: this.config.maxTokens,
+          response_format: { type: "json_object" },
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "无法读取错误响应体");
+        console.error(`💥 [AI Service] Suggestion API 响应错误 (${response.status}): ${errorText}`);
+        throw new Error(`AI suggestion API error (${response.status})`);
+      }
+
+      const aiResponse = await response.json();
+      const aiContent = aiResponse.choices[0]?.message?.content;
+      if (!aiContent) { throw new Error("从AI API返回了空内容 (suggestions)") }
+
+      try {
+        const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error("建议响应中未找到有效的JSON对象");
+        }
+      } catch (parseError) {
+        console.error("❌ [AI Service] 解析AI建议响应失败:", aiContent);
+        throw new Error(`从AI返回了无效的JSON (suggestions): ${parseError.message}`);
+      }
+
+    } catch (error) {
+      console.error("💣 [AI Service] 生成建议过程中发生错误:", error);
+      throw error;
+    }
+  }
+
+  private buildSuggestionPrompt(competencyData: CompetencyData[]): string {
+    const competenciesText = competencyData
+      .map(c => `${c.name}: 当前得分 ${c.current}, 上次得分 ${c.previous}, 历史平均分 ${c.historical}`)
+      .join('\n');
+
+    return `
+# 角色：AI职业发展教练
+
+## 核心任务
+你是一位专业的AI职业发展教练。请根据用户提供的能力评估数据，为他们生成2-3条高度个性化、可执行的成长建议。
+
+## 用户能力数据
+${competenciesText}
+
+## 你的输出要求
+1. **JSON格式**: 必须返回一个包含 \"suggestions\" 键的JSON对象，其值为一个建议对象数组。
+2. **建议对象结构**: 每个建议对象必须包含以下字段：
+   - title (string): 建议的简短标题
+   - description (string): 对建议的详细阐述，需要具体、可操作
+   - type (string): 建议类型，可选值为 improvement、strength 或 info
+3. **建议内容**:
+   - **识别关键**: 找出1-2个最需要提升的能力
+   - **发挥优势**: 强调1个最突出的优势，并建议如何进一步利用
+   - **有数据支撑**: 你的建议需要基于数据，例如，当一个能力的当前得分远低于历史平均分时，应指出这是一个退步，需要警惕
+   - **语气**: 你的语气应该是鼓励性的、支持性的，同时保持专业
+
+## JSON输出示例
+{
+  \"suggestions\": [
+    {
+      \"title\": \"重点提升：产品设计能力\",
+      \"description\": \"您在\'产品设计\'方面的得分（55分）相较于历史平均（70分）有明显下滑。建议您系统性地学习产品设计原则，并通过拆解知名App来锻炼分析能力。\",
+      \"type\": \"improvement\"
+    },
+    {
+      \"title\": \"发挥优势：数据分析能力\",
+      \"description\": \"您在\'数据分析\'上表现出色（88分），请继续保持！建议您在下一个项目中主动承担数据分析相关的任务，将此优势转化为项目成果。\",
+      \"type\": \"strength\"
+    }
+  ]
+}
+`;
+  }
 
   async evaluateAnswer(data: EvaluationRequest): Promise<IndividualEvaluationResponse> {
      try {

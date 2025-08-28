@@ -5,14 +5,36 @@ import { PracticeHistoryClient } from './client'
 
 export const dynamic = 'force-dynamic'
 
+// Define a more detailed interface for AI feedback
+interface AiFeedback {
+  summary?: string;
+  strengths?: string[];
+  improvements?: string[];
+  competency_scores?: Record<string, number>;
+}
+
+// Define the interface for the processed qualitative feedback
+interface QualitativeFeedback {
+  sessionId: string;
+  practiceDate: string;
+  questionText: string;
+  overallAssessment: {
+    level: string;
+    summary: string;
+  };
+  highlights: { title: string; description: string }[];
+  suggestions: { title: string; description: string; severity?: string }[];
+  actionPlan: { title: string; description: string }[];
+}
+
 interface PracticeSession {
   id: string
   overall_score: number
   content_score: number
   logic_score: number
   expression_score: number
-  practice_duration: number
   created_at: string
+  ai_feedback: string | null
   interview_questions: {
     question_text: string
   }
@@ -22,6 +44,7 @@ interface PracticeSession {
   question_categories: {
     category_name: string
   }
+  qualitative_feedback?: QualitativeFeedback
 }
 
 interface PracticeHistoryData {
@@ -36,7 +59,6 @@ async function getPracticeHistoryData(): Promise<PracticeHistoryData | null> {
   try {
     const supabase = await createClient()
     
-    // 获取用户信息
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     
     if (userError || !user) {
@@ -44,12 +66,11 @@ async function getPracticeHistoryData(): Promise<PracticeHistoryData | null> {
       return null
     }
 
-    // 获取练习会话数据
     const { data: sessionsData, error: sessionsError } = await supabase
       .from('practice_sessions')
       .select(`
         *,
-        interview_questions(question_text),
+        interview_questions(question_text, expected_answer),
         interview_stages(stage_name),
         question_categories(category_name)
       `)
@@ -67,9 +88,59 @@ async function getPracticeHistoryData(): Promise<PracticeHistoryData | null> {
       }
     }
 
-    const sessions = sessionsData || []
+    const sessions = (sessionsData || []).map(session => {
+      let qualitative_feedback: QualitativeFeedback = {
+        sessionId: session.id,
+        practiceDate: new Date(session.created_at).toISOString().split('T')[0],
+        questionText: session.interview_questions?.question_text || '问题文本不可用',
+        overallAssessment: {
+          level: '暂无评估',
+          summary: '暂无评估数据'
+        },
+        highlights: [],
+        suggestions: [],
+        actionPlan: [],
+      };
+
+      if (session.ai_feedback) {
+        try {
+          // It's possible ai_feedback is a stringified JSON
+          const feedback: AiFeedback = typeof session.ai_feedback === 'string' 
+            ? JSON.parse(session.ai_feedback) 
+            : session.ai_feedback;
+
+          qualitative_feedback = {
+            sessionId: session.id,
+            practiceDate: new Date(session.created_at).toISOString().split('T')[0],
+            questionText: session.interview_questions?.question_text || '问题文本不可用',
+            overallAssessment: {
+              level: '助理级表现',
+              summary: feedback.summary || '暂无总结'
+            },
+            highlights: (feedback.strengths || []).map((s: any) => (
+              typeof s === 'object' && s !== null
+                ? { title: s.competency || '', description: s.description || '' }
+                : { title: s, description: '' }
+            )),
+            suggestions: (feedback.improvements || []).map((i: any) => (
+              typeof i === 'object' && i !== null
+                ? { title: i.competency || '', description: i.description || '', severity: i.severity || 'moderate' }
+                : { title: i, description: '', severity: 'moderate' }
+            )),
+            actionPlan: (feedback.improvements || []).map((i: any) => {
+              const competency = typeof i === 'object' && i !== null ? i.competency : i;
+              return { title: `改进 ${competency}`, description: `针对 ${competency} 进行专项练习` };
+            }),
+          };
+        } catch (e) {
+          console.error(`Failed to parse ai_feedback for session ${session.id}:`, e);
+          qualitative_feedback.overallAssessment.summary = '评估数据解析失败';
+        }
+      }
+      
+      return { ...session, qualitative_feedback };
+    });
     
-    // 提取唯一的分类和阶段
     const categories = [...new Set(
       sessions
         .map(s => s.question_categories?.category_name)

@@ -129,8 +129,8 @@ ORDER BY event_object_table, trigger_name;
 
 -- 7. 测试插入数据到user_preferences表（如果表存在）
 -- 注意：这个查询只有在用户已登录且表存在时才会成功
--- INSERT INTO user_preferences (user_id, theme, language, timezone, difficulty_level, practice_duration)
--- VALUES (auth.uid(), 'light', 'zh-CN', 'Asia/Shanghai', 'intermediate', 30);
+-- INSERT INTO user_preferences (user_id, theme, language, timezone, difficulty_level)
+-- VALUES (auth.uid(), 'light', 'zh-CN', 'Asia/Shanghai', 'intermediate');
 
 -- 8. 查看当前用户的user_preferences数据（如果存在）
 -- SELECT * FROM user_preferences WHERE user_id = auth.uid();

@@ -11,7 +11,6 @@ interface PracticeSession {
   content_score: number
   logic_score: number
   expression_score: number
-  practice_duration: number
   created_at: string
   interview_questions: {
     question_text: string
@@ -55,7 +54,6 @@ async function getLearningReportData(): Promise<LearningReportData | null> {
       `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(50)
 
     if (sessionsError) {
       console.error('获取练习数据失败:', sessionsError)
@@ -123,7 +121,6 @@ export default async function LearningReportPage() {
             totalSessions: data.totalSessions,
             averageScore: data.averageScore,
             totalHighlights: 0,
-            totalDuration: data.sessions.reduce((sum, session) => sum + (session.practice_duration || 0), 0),
             progressTrend: data.improvementTrend
           }}
         />

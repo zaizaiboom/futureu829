@@ -62,20 +62,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 批量插入练习记录
-    const practiceRecords = questions_and_answers.map((qa: any) => ({
-      user_id: user.id,
-      question_id: qa.question_id || null,
-      stage_id: stage_id,
-      category_id: null, // 暂时设为null，后续可以根据问题类型设置
-      user_answer: qa.answer,
-      overall_score: evaluation_score,
-      content_score: evaluation_score, // 使用相同分数
-      logic_score: evaluation_score,   // 使用相同分数
-      expression_score: evaluation_score, // 使用相同分数
-      ai_feedback: JSON.stringify(ai_feedback),
-      practice_duration: null // 暂时设为null
-    }))
+    // 为每个问题计算分数并创建练习记录
+    const practiceRecords = questions_and_answers.map((qa: any, index: number) => {
+      const scores = calculateScores(ai_feedback, index, questions_and_answers.length)
+      
+      return {
+        user_id: user.id,
+        question_id: qa.question_id || null,
+        stage_id: stage_id,
+        category_id: null, // 暂时设为null
+        user_answer: qa.answer,
+        overall_score: scores.overall,
+        content_score: scores.content,
+        logic_score: scores.logic,
+        expression_score: scores.expression,
+        ai_feedback: JSON.stringify(ai_feedback) // 保存完整的AI反馈
+      }
+    })
 
     // 批量插入练习记录
     const { data: insertedData, error: insertError } = await supabase

@@ -207,16 +207,26 @@ export default function InterviewDetailPage() {
               <div className="flex items-center gap-3">
                 <Calendar className="h-5 w-5 text-gray-500" />
                 <div>
-                  <p className="text-sm text-gray-600">练习日期</p>
-                  <p className="font-medium">{new Date(interview.date).toLocaleDateString('zh-CN')}</p>
+                  <p className="text-sm text-gray-600">练习开始时间</p>
+                  <p className="font-medium">
+                    {new Date(interview.date).toLocaleString('zh-CN', { 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric', 
+                      hour: '2-digit', 
+                      minute: '2-digit' 
+                    })}
+                  </p>
                 </div>
               </div>
               
               <div className="flex items-center gap-3">
                 <Clock className="h-5 w-5 text-gray-500" />
                 <div>
-                  <p className="text-sm text-gray-600">练习时间</p>
-                  <p className="font-medium">{new Date(interview.date).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</p>
+                  <p className="text-sm text-gray-600">练习用时</p>
+                  <p className="font-medium">
+                    {interview.duration ? `${interview.duration} 分钟` : '未记录'}
+                  </p>
                 </div>
               </div>
               

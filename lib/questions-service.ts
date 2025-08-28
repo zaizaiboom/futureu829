@@ -8,6 +8,7 @@ export interface Question {
   difficulty_level: string
   expected_answer: string
   keywords: string[]
+  answer_suggestion: string
 }
 
 export interface QuestionCategory {

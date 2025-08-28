@@ -25,7 +25,6 @@ CREATE TABLE IF NOT EXISTS public.user_preferences (
     timezone VARCHAR(50) DEFAULT 'Asia/Shanghai',
     
     -- 练习偏好
-    default_practice_duration INTEGER DEFAULT 30, -- 默认练习时长（分钟）
     difficulty_preference VARCHAR(20) DEFAULT 'medium' CHECK (difficulty_preference IN ('easy', 'medium', 'hard', 'mixed')),
     
     -- 时间戳

@@ -19,7 +19,6 @@ BEGIN
             language VARCHAR(10) DEFAULT 'zh-CN' CHECK (language IN ('zh-CN', 'en-US')),
             timezone VARCHAR(50) DEFAULT 'Asia/Shanghai',
             difficulty_level VARCHAR(20) DEFAULT 'intermediate' CHECK (difficulty_level IN ('beginner', 'intermediate', 'advanced')),
-            practice_duration INTEGER DEFAULT 30 CHECK (practice_duration > 0 AND practice_duration <= 180),
             created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
             UNIQUE(user_id)

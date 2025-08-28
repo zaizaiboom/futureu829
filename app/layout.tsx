@@ -4,6 +4,8 @@ import { GeistMono } from 'geist/font/mono'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from 'sonner'
 import './globals.css'
+import { createClient } from '@/lib/supabase/server'
+import AppShell from '@/components/app-shell'
 
 export const metadata: Metadata = {
   title: 'FutureU - AI面试练习平台',
@@ -11,15 +13,22 @@ export const metadata: Metadata = {
   generator: 'v0.app',
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: `
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
           (function() {
             var theme = localStorage.getItem('theme');
             if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -28,16 +37,21 @@ export default function RootLayout({
               document.documentElement.classList.remove('dark');
             }
           })();
-        ` }} />
+        `,
+          }}
+        />
       </head>
       <body className={GeistSans.className}>
+        <div className="animated-gradient"></div>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <AppShell user={user}>
+            {children}
+          </AppShell>
           <Toaster richColors position="top-center" />
         </ThemeProvider>
       </body>

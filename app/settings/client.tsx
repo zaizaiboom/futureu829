@@ -160,14 +160,26 @@ export function SettingsClient({ user }: SettingsClientProps) {
 
   const deleteAccount = async () => {
     try {
-      // 这里应该调用后端API来删除账户
-      // 目前只是登出用户
+      // 调用删除账户API
+      const response = await fetch('/api/delete-account', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || '删除账户失败')
+      }
+
+      // 删除成功后登出并跳转
       await supabase.auth.signOut()
       router.push('/auth/login')
-      toast.success('账户已删除')
+      toast.success('账户已成功删除')
     } catch (error) {
       console.error('Error deleting account:', error)
-      toast.error('删除账户失败')
+      toast.error(error instanceof Error ? error.message : '删除账户失败')
     }
   }
 

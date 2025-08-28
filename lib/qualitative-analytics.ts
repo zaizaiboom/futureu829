@@ -193,7 +193,7 @@ export const generateQualitativeCompetencyData = (
     const level = qualitativeAnalytics.analyzeCompetencyLevel(competency, feedbacks);
     
     return {
-      competency,
+      title: competency,
       description: competencyDescriptions[competency] || '综合能力评估',
       level,
       highlightCount,
@@ -365,7 +365,9 @@ export const generateMockQualitativeFeedback = (count: number): QualitativeFeedb
       questionText: `模拟面试问题 ${i + 1}`,
       overallAssessment: {
         level: ['初级表现', '助理级表现', '高级表现'][Math.floor(Math.random() * 3)],
-        summary: '整体表现良好，在某些方面有突出表现，同时也有需要改进的地方。'
+        summary: '本次练习表现良好，在核心概念理解上展现了扎实的基础。建议在后续练习中，进一步加强案例分析的深度和广度。',
+        strengths: selectedHighlights.map(h => ({ title: h.title, description: h.description })),
+        areasForImprovement: selectedSuggestions.map(s => ({ title: s.title, description: s.description, severity: s.severity }))
       },
       highlights: selectedHighlights,
       suggestions: selectedSuggestions,

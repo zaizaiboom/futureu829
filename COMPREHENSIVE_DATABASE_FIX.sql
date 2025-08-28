@@ -62,7 +62,6 @@ CREATE TABLE IF NOT EXISTS public.practice_sessions (
     user_answer TEXT,
     ai_feedback TEXT,
     score INTEGER CHECK (score >= 0 AND score <= 100),
-    session_duration INTEGER, -- 练习时长（秒）
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
@@ -93,7 +92,6 @@ CREATE TABLE IF NOT EXISTS public.user_preferences (
     theme VARCHAR(20) DEFAULT 'light' CHECK (theme IN ('light', 'dark', 'system')),
     language VARCHAR(10) DEFAULT 'zh-CN',
     timezone VARCHAR(50) DEFAULT 'Asia/Shanghai',
-    default_practice_duration INTEGER DEFAULT 30,
     difficulty_preference VARCHAR(20) DEFAULT 'medium' CHECK (difficulty_preference IN ('easy', 'medium', 'hard', 'mixed')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

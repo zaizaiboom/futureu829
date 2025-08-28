@@ -13,12 +13,19 @@ import { LogOut, ChevronDown } from "lucide-react"
 import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase/client"
 
-interface UserMenuProps {
-  userEmail: string
-  onLogout: () => void
+interface User {
+  id: string
+  email: string
 }
 
-export default function UserMenu({ userEmail, onLogout }: UserMenuProps) {
+interface UserMenuProps {
+  user: User
+  onLogout: () => void
+  onToggleMobileSidebar?: () => void
+}
+
+export default function UserMenu({ user, onLogout }: UserMenuProps) {
+  const userEmail = user.email
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
 
@@ -47,10 +54,13 @@ export default function UserMenu({ userEmail, onLogout }: UserMenuProps) {
   }, [])
 
   const getInitials = (email: string, name?: string | null) => {
-    if (name) {
+    if (name && name.length > 0) {
       return name.charAt(0).toUpperCase()
     }
-    return email.charAt(0).toUpperCase()
+    if (email && email.length > 0) {
+      return email.charAt(0).toUpperCase()
+    }
+    return 'U' // 默认用户头像
   }
 
   return (

@@ -26,7 +26,6 @@ export async function GET(
         content_score,
         logic_score,
         expression_score,
-        practice_duration,
         ai_feedback,
         interview_questions(
           question_text
@@ -73,7 +72,6 @@ export async function GET(
         logic: session.logic_score,
         expression: session.expression_score
       },
-      duration: session.practice_duration,
       question: session.interview_questions?.question_text || '问题加载失败',
       aiFeedback: aiFeedback,
       questions: [{

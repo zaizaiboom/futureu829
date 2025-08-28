@@ -1,11 +1,9 @@
 import LandingPage from "../landing-page"
-import { UserGuideModal } from '@/components/user-guide-modal'
 
 export default function Page() {
   return (
     <div>
       <LandingPage />
-      <UserGuideModal />
     </div>
   )
 }

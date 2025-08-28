@@ -6,7 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Calendar, Filter, Clock, Eye, Target, CheckCircle, AlertTriangle, Lightbulb, History } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Calendar, Filter, Clock, Eye, Target, CheckCircle, AlertTriangle, Lightbulb, History, Info } from 'lucide-react'
 import { format } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import Link from 'next/link'
@@ -20,10 +21,10 @@ interface PracticeSession {
   category_id: number
   user_answer: string
   ai_feedback: string
-  practice_duration: number
   created_at: string
   interview_questions: {
     question_text: string
+    expected_answer?: string
   }
   interview_stages: {
     stage_name: string
@@ -45,8 +46,9 @@ interface FilterOptions {
 interface PracticeHistoryClientProps {
   user: User
   sessions: PracticeSession[]
-  stages: any[]
-  categories: any[]
+  totalSessions: number
+  stages: string[]
+  categories: string[]
 }
 
 const SORT_OPTIONS = [
@@ -61,37 +63,29 @@ const DATE_RANGE_OPTIONS = [
   { value: '90days', label: '最近90天' }
 ]
 
-export function PracticeHistoryClient({ user, sessions, stages, categories }: PracticeHistoryClientProps) {
+export function PracticeHistoryClient({ user, sessions, totalSessions, stages, categories }: PracticeHistoryClientProps) {
   const [filteredSessions, setFilteredSessions] = useState<PracticeSession[]>(sessions)
   const [filters, setFilters] = useState<FilterOptions>({
     stage: 'all',
-    category: 'all',
-    dateRange: 'all',
-    sortBy: 'created_at_desc'
   })
-  
-  const [qualitativeFeedbacks, setQualitativeFeedbacks] = useState<Map<string, QualitativeFeedback>>(new Map())
+
   const [coreImprovementArea, setCoreImprovementArea] = useState<string>('暂无数据')
 
   useEffect(() => {
-    // 在客户端渲染后生成定性反馈数据
-    const feedbackMap = new Map<string, QualitativeFeedback>()
-    sessions.forEach(session => {
-      const mockData = generateMockQualitativeFeedback(1)[0]
-      feedbackMap.set(session.id, {
-        ...mockData,
-        sessionId: session.id
-      })
-    })
-    setQualitativeFeedbacks(feedbackMap)
-    
-    // 计算核心提升点
-    if (sessions.length > 0) {
-      const allFeedbacks = Array.from(feedbackMap.values())
-      const improvement = qualitativeAnalytics.getMostFrequentSuggestion(allFeedbacks)
-      setCoreImprovementArea(improvement)
+    // 基于已有的 sessions 数据计算核心提升点
+    if (sessions && sessions.length > 0) {
+      const allFeedback = sessions.map(s => s.qualitative_feedback).filter(Boolean) as QualitativeFeedback[];
+      if (allFeedback.length > 0) {
+        const growthAdvice = qualitativeAnalytics.generateGrowthAdvice(allFeedback);
+        console.log('Setting core improvement area:', growthAdvice);
+        setCoreImprovementArea(growthAdvice);
+      } else {
+        setCoreImprovementArea('暂无数据');
+      }
+    } else {
+      setCoreImprovementArea('暂无数据');
     }
-  }, [sessions])
+  }, [sessions]);
 
   useEffect(() => {
     applyFilters()
@@ -102,42 +96,18 @@ export function PracticeHistoryClient({ user, sessions, stages, categories }: Pr
 
     // 按阶段筛选
     if (filters.stage !== 'all') {
-      filtered = filtered.filter(session => session.stage_id.toString() === filters.stage)
+      filtered = filtered.filter(session => session.interview_stages?.stage_name === filters.stage)
     }
 
-    // 按类别筛选
-    if (filters.category !== 'all') {
-      filtered = filtered.filter(session => session.category_id.toString() === filters.category)
-    }
-
-    // 按日期范围筛选
-    if (filters.dateRange !== 'all') {
-      const now = new Date()
-      const days = parseInt(filters.dateRange.replace('days', ''))
-      const cutoffDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
-      filtered = filtered.filter(session => new Date(session.created_at) >= cutoffDate)
-    }
-
-    // 排序
+    // 默认按创建时间降序排序
     filtered.sort((a, b) => {
-      switch (filters.sortBy) {
-        case 'created_at_desc':
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        case 'created_at_asc':
-          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        default:
-          return 0
-      }
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     })
 
     setFilteredSessions(filtered)
   }
 
-  const formatDuration = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60)
-    const remainingSeconds = seconds % 60
-    return `${minutes}分${remainingSeconds}秒`
-  }
+
 
   const getStageColor = (stageId: number) => {
     const colors = [
@@ -149,23 +119,30 @@ export function PracticeHistoryClient({ user, sessions, stages, categories }: Pr
     return colors[(stageId - 1) % colors.length] || 'bg-gray-100 text-gray-800'
   }
 
-  // 获取模拟的定性反馈数据（实际应用中应从后端获取）
   const getQualitativeFeedback = (sessionId: string): QualitativeFeedback | undefined => {
-    return qualitativeFeedbacks.get(sessionId)
+    const session = filteredSessions.find(s => s.id === sessionId);
+    return session?.qualitative_feedback;
   }
 
   // 获取核心提升点
   const getCoreImprovementArea = () => {
-    return coreImprovementArea
+    // 确保返回字符串
+    if (typeof coreImprovementArea === 'string') {
+      return coreImprovementArea;
+    }
+    if(coreImprovementArea && typeof coreImprovementArea === 'object'){
+      return JSON.stringify(coreImprovementArea);
+    }
+    return '暂无数据';
   }
 
   const calculateStats = () => {
-    const totalSessions = filteredSessions.length
-    
-    return { totalSessions }
+    const filteredSessionsCount = filteredSessions.length
+
+    return { filteredSessionsCount }
   }
 
-  const { totalSessions } = calculateStats()
+  const { filteredSessionsCount } = calculateStats()
 
   return (
     <>
@@ -179,109 +156,68 @@ export function PracticeHistoryClient({ user, sessions, stages, categories }: Pr
           </div>
 
           {/* 筛选和排序工具栏 */}
-          <Card className="mb-6">
-            <CardContent className="p-6">
-              <div className="flex flex-wrap gap-4 items-center">
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm font-medium text-gray-700">筛选条件:</span>
+          <Card className="mb-6 border-l-4 border-l-purple-500 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
+              <div className="flex flex-wrap gap-3 items-center">
+                <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg">
+                  <Filter className="h-4 w-4 text-purple-600" />
+                  <span className="text-sm font-semibold text-gray-700">筛选条件</span>
                 </div>
                 
                 {/* 面试阶段筛选 */}
-                <Select value={filters.stage} onValueChange={(value) => setFilters(prev => ({ ...prev, stage: value }))}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="选择阶段" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">全部阶段</SelectItem>
-                    {stages.filter(stage => stage.id != null).map(stage => (
-                      <SelectItem key={stage.id} value={stage.id.toString()}>
-                        {stage.stage_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* 问题类别筛选 */}
-                <Select value={filters.category} onValueChange={(value) => setFilters(prev => ({ ...prev, category: value }))}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="选择类别" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">全部类别</SelectItem>
-                    {categories.map(category => (
-                      <SelectItem key={category.id} value={category.id.toString()}>
-                        {category.category_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* 日期范围筛选 */}
-                <Select value={filters.dateRange} onValueChange={(value) => setFilters(prev => ({ ...prev, dateRange: value }))}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue placeholder="时间范围" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DATE_RANGE_OPTIONS.map(option => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* 排序方式 */}
-                <Select value={filters.sortBy} onValueChange={(value) => setFilters(prev => ({ ...prev, sortBy: value }))}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="排序方式" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SORT_OPTIONS.map(option => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">面试阶段:</span>
+                  <Select value={filters.stage} onValueChange={(value) => setFilters(prev => ({ ...prev, stage: value }))}>
+                    <SelectTrigger className="w-36 border-purple-200 focus:border-purple-400 focus:ring-purple-200">
+                      <SelectValue placeholder="选择阶段" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">全部阶段</SelectItem>
+                      {stages.map((stage, index) => (
+                        <SelectItem key={index} value={stage}>
+                          {stage}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardContent>
           </Card>
 
           {/* 统计卡片 */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <Card className="bg-gradient-to-r from-purple-500 to-pink-500 text-white">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-purple-100 text-sm">总练习次数</p>
-                    <p className="text-3xl font-bold">{sessions.length}</p>
-                  </div>
-                  <History className="h-8 w-8 text-purple-200" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-r from-orange-500 to-yellow-500 text-white">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 max-w-4xl mx-auto">
+            <Card className="bg-gradient-to-r from-orange-400 to-yellow-400 text-white flex flex-col">
+              <CardContent className="p-6 flex-grow flex flex-col">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
                     <p className="text-orange-100 text-sm">核心提升点</p>
-                    <p className="text-lg font-bold truncate">
-                      {sessions.length > 0 ? getCoreImprovementArea() : '暂无数据'}
-                    </p>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-orange-200 cursor-pointer" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>基于所有练习的AI定性评估，提炼出的最需要关注和提升的能力领域。</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                   <Lightbulb className="h-8 w-8 text-orange-200" />
                 </div>
+                <p className="text-base font-semibold flex-grow">
+                  {sessions.length > 0 ? getCoreImprovementArea() : '暂无数据'}
+                </p>
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-r from-green-500 to-emerald-500 text-white">
-              <CardContent className="p-6">
+            <Card className="bg-gradient-to-r from-green-500 to-emerald-500 text-white flex flex-col">
+              <CardContent className="p-6 flex-grow">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-green-100 text-sm">筛选结果</p>
-                    <p className="text-3xl font-bold">{totalSessions}</p>
+                    <p className="text-3xl font-bold">{filteredSessionsCount}</p>
+                    <p className="text-green-100 text-xs mt-1">条练习记录</p>
                   </div>
                   <Filter className="h-8 w-8 text-green-200" />
                 </div>
@@ -306,126 +242,112 @@ export function PracticeHistoryClient({ user, sessions, stages, categories }: Pr
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-4">
-              {filteredSessions.map((session) => {
-                const feedback = getQualitativeFeedback(session.id)
-                // 如果反馈数据还未加载，跳过渲染
-                if (!feedback) return null
-                
-                // 获取最多2个亮点和2个建议
-                const displayHighlights = feedback.highlights.slice(0, 2)
-                const displaySuggestions = feedback.suggestions.slice(0, 2)
-                
-                // 根据严重性等级获取图标和样式
+            <div className="relative border-l-2 border-gray-200 pl-8 space-y-10">
+              {filteredSessions.map((session, index) => {
+                const feedback = getQualitativeFeedback(session.id);
+                const displayHighlights = feedback?.highlights?.slice(0, 2) || [];
+                const displaySuggestions = feedback?.suggestions?.slice(0, 2) || [];
+
                 const getSeverityIcon = (severity?: string) => {
                   switch (severity) {
-                    case 'critical': return '❌'
-                    case 'moderate': return '⚠️'
-                    case 'minor': return '💡'
-                    default: return '⚠️'
+                    case 'critical': return <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />;
+                    case 'moderate': return <AlertTriangle className="h-4 w-4 text-orange-500 flex-shrink-0" />;
+                    case 'minor': return <Lightbulb className="h-4 w-4 text-yellow-500 flex-shrink-0" />;
+                    default: return <AlertTriangle className="h-4 w-4 text-orange-500 flex-shrink-0" />;
                   }
-                }
-                
-                const getSeverityStyle = (severity?: string) => {
-                  switch (severity) {
-                    case 'critical': return 'bg-red-100 text-red-800 border-red-200'
-                    case 'moderate': return 'bg-orange-100 text-orange-800 border-orange-200'
-                    case 'minor': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-                    default: return 'bg-orange-100 text-orange-800 border-orange-200'
-                  }
-                }
-                
+                };
+
                 return (
-                  <Card key={session.id} className="hover:shadow-lg transition-all duration-300 group border-l-4 border-l-purple-500">
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          {/* 练习信息头部 */}
-                          <div className="flex items-center gap-4 mb-4">
-                            <div className="flex items-center gap-2 text-gray-600">
-                              <Calendar className="h-4 w-4" />
-                              <span className="font-medium">
-                                {format(new Date(session.created_at), 'yyyy年MM月dd日', { locale: zhCN })}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 text-gray-600">
-                              <Clock className="h-4 w-4" />
-                              <span>{formatDuration(session.practice_duration)}</span>
-                            </div>
+                  <div key={session.id} className="relative">
+                    <div className="absolute -left-[3.2rem] top-1 flex items-center">
+                      <span className="h-4 w-4 bg-white border-2 border-purple-500 rounded-full"></span>
+                      <div className="w-8 border-t-2 border-gray-200"></div>
+                    </div>
+                    <Card className="transition-all duration-300 hover:shadow-xl border rounded-xl overflow-hidden">
+                      <CardHeader className="p-4 bg-gray-50 border-b">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Calendar className="h-5 w-5 text-gray-500" />
+                            <span className="font-semibold text-gray-800">
+                              {format(new Date(session.created_at), 'yyyy年MM月dd日 HH:mm', { locale: zhCN })}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
                             <Badge className={getStageColor(session.stage_id)}>
                               {session.interview_stages?.stage_name ?? '未知阶段'}
                             </Badge>
-                            <Badge variant="outline">
-                              {session.question_categories?.category_name ?? '未知类别'}
-                            </Badge>
+                            {session.question_categories?.category_name && (
+                              <Badge variant="outline" className="border-gray-300">
+                                {session.question_categories.category_name}
+                              </Badge>
+                            )}
                           </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-6">
+                        <div className="mb-5">
+                          <p className="text-gray-800 font-medium">
+                            {session.interview_questions?.question_text ?? '未知问题'}
+                          </p>
+                        </div>
 
-                          {/* 问题内容 */}
-                          <div className="mb-4">
-                            <p className="text-gray-900 font-medium mb-2">练习问题:</p>
-                            <p className="text-gray-700 bg-gray-50 p-3 rounded-lg border-l-4 border-l-purple-300">
-                              {session.interview_questions?.question_text ?? '未知问题'}
-                            </p>
-                          </div>
-
-                          {/* AI核心诊断 */}
-                          <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4 mb-4">
-                            <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                              <Target className="h-4 w-4" />
-                              AI核心诊断
+                        <div className="space-y-6">
+                          <div>
+                            <h4 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                              <History className="h-5 w-5 text-blue-500" />
+                              我的回答
                             </h4>
-                            <div className="space-y-3">
-                              {/* 亮点标签 */}
-                              {displayHighlights.length > 0 && (
-                                <div>
-                                  <p className="text-xs font-medium text-gray-600 mb-2">表现亮点</p>
-                                  <div className="flex flex-wrap gap-2">
-                                    {displayHighlights.map((highlight, index) => (
-                                      <div key={index} className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-800 border border-green-200 rounded-lg">
-                                        <CheckCircle className="h-4 w-4 flex-shrink-0" />
-                                        <span className="text-sm font-medium truncate">
-                                          {highlight.title}
-                                        </span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                              
-                              {/* 建议标签 */}
-                              {displaySuggestions.length > 0 && (
-                                <div>
-                                  <p className="text-xs font-medium text-gray-600 mb-2">改进建议</p>
-                                  <div className="flex flex-wrap gap-2">
-                                    {displaySuggestions.map((suggestion, index) => (
-                                      <div key={index} className={`flex items-center gap-2 px-3 py-2 border rounded-lg ${getSeverityStyle(suggestion.severity)}`}>
-                                        <span className="text-sm flex-shrink-0">{getSeverityIcon(suggestion.severity)}</span>
-                                        <span className="text-sm font-medium truncate">
-                                          {suggestion.title}
-                                        </span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
+                            <p className="text-gray-700 text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded-md">{session.user_answer || '未提供回答'}</p>
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                              <Lightbulb className="h-5 w-5 text-yellow-500" />
+                              期望答案
+                            </h4>
+                            <p className="text-gray-700 text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded-md">{session.interview_questions?.expected_answer || '暂无期望答案'}</p>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                              <h4 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                <CheckCircle className="h-5 w-5 text-green-500" />
+                                综合表现亮点
+                              </h4>
+                              <div className="space-y-2">
+                                {displayHighlights.length > 0 ? (
+                                  displayHighlights.map((highlight, index) => (
+                                    <div key={index} className="flex items-start gap-2 text-sm">
+                                      <div className="text-green-500 mt-1">✓</div>
+                                      <span className="text-gray-700">{highlight.title}</span>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <p className="text-gray-500 text-sm">暂无亮点</p>
+                                )}
+                              </div>
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                <Target className="h-5 w-5 text-red-500" />
+                                综合改进建议
+                              </h4>
+                              <div className="space-y-2">
+                                {displaySuggestions.length > 0 ? (
+                                  displaySuggestions.map((suggestion, index) => (
+                                    <div key={index} className="flex items-start gap-2 text-sm">
+                                      <div className="mt-1">{getSeverityIcon(suggestion.severity)}</div>
+                                      <span className="text-gray-700">{suggestion.title}</span>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <p className="text-gray-500 text-sm">暂无建议</p>
+                                )}
+                              </div>
                             </div>
                           </div>
-
-                          {/* 查看详情按钮 */}
-                          <Button 
-                            variant="outline" 
-                            className="border-purple-200 text-purple-700 hover:bg-purple-50 hover:border-purple-300 group-hover:bg-gradient-to-r group-hover:from-purple-600 group-hover:to-pink-600 group-hover:text-white group-hover:border-transparent transition-all duration-300"
-                            asChild
-                          >
-                            <Link href={`/practice-history/${session.id}`}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              查看详情
-                            </Link>
-                          </Button>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  </div>
                 )
               })}
             </div>

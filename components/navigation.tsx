@@ -170,73 +170,9 @@ export default function Navigation({ currentPage }: NavigationProps) {
             )}
           </div>
 
-          {/* 右侧：导航菜单 + 用户菜单 */}
+          {/* 右侧：空白区域，用户菜单已移至侧边栏 */}
           <div className="flex items-center space-x-4">
-            {/* 导航菜单 */}
-            <div className="hidden md:flex items-center space-x-2">
-              {navigationItems.map((item) => {
-                const IconComponent = item.icon
-                const isActive = currentPage === item.key
-                return (
-                  <Link key={item.key} href={item.href}>
-                    <Button
-                      variant={isActive ? "default" : "ghost"}
-                      size="sm"
-                      className="flex items-center space-x-2"
-                    >
-                      <IconComponent className="w-4 h-4" />
-                      <span>{item.label}</span>
-                    </Button>
-                  </Link>
-                )
-              })}
-            </div>
-
-            {/* 用户菜单 */}
-            {user && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={profile?.avatar_url || ''} alt={user.email || ''} />
-                      <AvatarFallback>
-                        {profile?.full_name?.charAt(0).toUpperCase() || profile?.username?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end" forceMount>
-                  <div className="flex flex-col space-y-1 p-2">
-                    <p className="text-sm font-medium leading-none">{profile?.full_name || profile?.username || '用户'}</p>
-                    <p className="text-xs leading-none text-muted-foreground">
-                      {user.email}
-                    </p>
-                  </div>
-                  <DropdownMenuSeparator />
-                  
-                  {/* 移动端导航菜单 */}
-                  <div className="md:hidden">
-                    {navigationItems.map((item) => {
-                      const IconComponent = item.icon
-                      return (
-                        <DropdownMenuItem key={item.key} asChild>
-                          <Link href={item.href} className="flex items-center space-x-2">
-                            <IconComponent className="w-4 h-4" />
-                            <span>{item.label}</span>
-                          </Link>
-                        </DropdownMenuItem>
-                      )
-                    })}
-                    <DropdownMenuSeparator />
-                  </div>
-                  
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-600">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>退出登录</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+            {/* 预留空间用于未来功能 */}
           </div>
         </div>
       </div>

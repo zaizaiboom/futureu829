@@ -122,7 +122,6 @@
        language VARCHAR(10) DEFAULT 'zh-CN',
        timezone VARCHAR(50) DEFAULT 'Asia/Shanghai',
        difficulty_level VARCHAR(20) DEFAULT 'intermediate',
-       practice_duration INTEGER DEFAULT 30,
        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
    );
