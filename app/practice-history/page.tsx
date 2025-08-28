@@ -1,5 +1,4 @@
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { PracticeHistoryClient } from './client';
 import { QualitativeFeedback } from '@/types/qualitative-feedback';
@@ -28,7 +27,7 @@ interface PracticeHistoryData {
 
 async function getPracticeHistoryData(): Promise<PracticeHistoryData | null> {
   try {
-    const supabase = createServerComponentClient({ cookies })
+    const supabase = await createSupabaseServerClient()
     
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     

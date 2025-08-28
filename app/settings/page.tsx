@@ -1,5 +1,4 @@
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import { SettingsClient } from './client'
@@ -22,7 +21,7 @@ interface SettingsData {
 
 async function getSettingsData(): Promise<SettingsData | null> {
   try {
-    const supabase = createServerComponentClient({ cookies })
+    const supabase = await createSupabaseServerClient()
     
     // 获取用户信息
     const { data: { user }, error: userError } = await supabase.auth.getUser()

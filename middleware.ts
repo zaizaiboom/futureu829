@@ -47,6 +47,10 @@ export async function middleware(request: NextRequest) {
 
   if (user && pathname === '/auth/login') {
     const redirectTo = request.nextUrl.searchParams.get('redirectTo')
+    // 避免重定向循环，如果 redirectTo 是受保护的路由，直接跳转到首页
+    if (redirectTo && protectedRoutes.some(route => redirectTo.startsWith(route))) {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
     return NextResponse.redirect(new URL(redirectTo || '/', request.url))
   }
   // --- 路由保护逻辑结束 ---
