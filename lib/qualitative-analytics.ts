@@ -193,7 +193,7 @@ export const generateQualitativeCompetencyData = (
     const level = qualitativeAnalytics.analyzeCompetencyLevel(competency, feedbacks);
     
     return {
-      title: competency,
+      competency: competency,
       description: competencyDescriptions[competency] || '综合能力评估',
       level,
       highlightCount,
@@ -298,7 +298,7 @@ const tagDiversityManager = new TagDiversityManager();
 export const generateMockQualitativeFeedback = (count: number): QualitativeFeedback[] => {
   // 重置标签管理器
   tagDiversityManager.reset();
-  
+
   const mockHighlights = [
     { title: '创意联想能力', description: '在回答中展现了出色的创意思维和联想能力' },
     { title: '逻辑结构清晰', description: '回答逻辑性强，结构层次分明' },
@@ -309,8 +309,14 @@ export const generateMockQualitativeFeedback = (count: number): QualitativeFeedb
     { title: '观点独特', description: '提出了独特且有价值的观点' },
     { title: '分析深入', description: '对问题进行了深入透彻的分析' }
   ];
+
+  type MockSuggestion = {
+    title: string;
+    description: string;
+    severity: 'critical' | 'moderate' | 'minor';
+  };
   
-  const mockSuggestions = [
+  const mockSuggestions: MockSuggestion[] = [
     { title: '内容相关性', description: '建议加强回答与问题的相关性，避免偏题', severity: 'moderate' },
     { title: '逻辑连贯性', description: '可以进一步提升论述的逻辑连贯性', severity: 'moderate' },
     { title: '具体案例支撑', description: '建议增加具体案例来支撑观点', severity: 'moderate' },
@@ -341,7 +347,7 @@ export const generateMockQualitativeFeedback = (count: number): QualitativeFeedb
     let selectedSuggestions = tagDiversityManager.selectTags(mockSuggestions, suggestionCount, i);
     
     // 确保建议中包含不同严重性等级的多样性
-    const severityTypes = ['critical', 'moderate', 'minor'];
+    const severityTypes = ['critical', 'moderate', 'minor'] as const;
     const currentSeverities = selectedSuggestions.map(s => s.severity);
     const missingSeverities = severityTypes.filter(type => !currentSeverities.includes(type));
     

@@ -140,7 +140,7 @@ console.log("🎯 [API] 开始逐题评估处理:", {
     // 使用Promise.allSettled来确保即使有单个评估失败，也不会中断整个流程
     const settledEvaluations = await Promise.allSettled(evaluationPromises)
 
-    const individualEvaluations = settledEvaluations.map((result, index) => {
+    const individualEvaluations = await Promise.all(settledEvaluations.map(async (result, index) => {
       if (result.status === 'fulfilled') {
         return result.value
       } else {
@@ -178,7 +178,7 @@ console.log("🎯 [API] 开始逐题评估处理:", {
         const aiService = getAIEvaluationService()
         return aiService.generateFallbackEvaluation(requestData, result.reason)
       }
-    })
+    }))
     
     console.log("🔄 [API] 所有单题评估完成，开始生成汇总报告")
 

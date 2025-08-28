@@ -67,18 +67,18 @@ export async function GET(
       totalScore: session.overall_score,
       status: 'completed', // 所有保存的练习都是已完成状态
       questionCount: 1, // 每个练习记录对应一个问题
-      stageName: session.interview_stages?.stage_name || '未知阶段',
-      categoryName: session.question_categories?.category_name || '未知分类',
+      stageName: session.interview_stages?.[0]?.stage_name || '未知阶段',
+      categoryName: session.question_categories?.[0]?.category_name || '未知分类',
       scores: {
         content: session.content_score,
         logic: session.logic_score,
         expression: session.expression_score
       },
-      question: session.interview_questions?.question_text || '问题加载失败',
+      question: session.interview_questions?.[0]?.question_text || '问题加载失败',
       aiFeedback: aiFeedback,
       questions: [{
         id: session.id,
-        question: session.interview_questions?.question_text || '问题加载失败',
+        question: session.interview_questions?.[0]?.question_text || '问题加载失败',
         answer: '用户回答', // 实际回答内容可能需要从其他地方获取
         feedback: aiFeedback ? JSON.stringify(aiFeedback) : '暂无反馈',
         score: session.overall_score,

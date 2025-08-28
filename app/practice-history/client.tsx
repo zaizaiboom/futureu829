@@ -12,29 +12,9 @@ import { format } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import Link from 'next/link'
 import Navigation from '@/components/navigation'
-import { QualitativeFeedback, generateMockQualitativeFeedback, qualitativeAnalytics } from '@/lib/qualitative-analytics'
-
-interface PracticeSession {
-  id: string
-  question_id: number
-  stage_id: number
-  category_id: number
-  user_answer: string
-  ai_feedback: string
-  created_at: string
-  interview_questions: {
-    question_text: string
-    expected_answer?: string
-  }
-  interview_stages: {
-    stage_name: string
-  }
-  question_categories: {
-    category_name: string
-  }
-  // 新增定性反馈数据
-  qualitative_feedback?: QualitativeFeedback
-}
+import { generateMockQualitativeFeedback, qualitativeAnalytics } from '@/lib/qualitative-analytics'
+import { QualitativeFeedback } from '@/types/qualitative-feedback'
+import { PracticeSession } from '@/types/practice-session';
 
 interface FilterOptions {
   stage: string
@@ -67,6 +47,9 @@ export function PracticeHistoryClient({ user, sessions, totalSessions, stages, c
   const [filteredSessions, setFilteredSessions] = useState<PracticeSession[]>(sessions)
   const [filters, setFilters] = useState<FilterOptions>({
     stage: 'all',
+    category: 'all',
+    dateRange: 'all',
+    sortBy: 'created_at_desc'
   })
 
   const [coreImprovementArea, setCoreImprovementArea] = useState<string>('暂无数据')

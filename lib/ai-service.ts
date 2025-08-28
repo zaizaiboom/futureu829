@@ -6,6 +6,7 @@ import type {
   IndividualEvaluationResponse,
   EvaluationServiceConfig,
 } from '../types/evaluation'
+import type { CompetencyData } from '../types/competency';
 
 class AIEvaluationService {
   private readonly config: EvaluationServiceConfig
@@ -147,7 +148,8 @@ class AIEvaluationService {
         }
       } catch (parseError) {
         console.error("❌ [AI Service] 解析AI建议响应失败:", aiContent);
-        throw new Error(`从AI返回了无效的JSON (suggestions): ${parseError.message}`);
+        const message = parseError instanceof Error ? parseError.message : String(parseError);
+        throw new Error(`从AI返回了无效的JSON (suggestions): ${message}`);
       }
 
     } catch (error) {
@@ -251,14 +253,16 @@ ${competenciesText}
          }
        } catch (parseError) {
          console.error("❌ [AI Service] 解析AI响应失败:", aiContent)
-         throw new Error(`从AI返回了无效的JSON: ${parseError.message}`)
+         const message = parseError instanceof Error ? parseError.message : String(parseError);
+         throw new Error(`从AI返回了无效的JSON: ${message}`)
        }
  
        this.validateIndividualEvaluationResult(evaluationResult)
        return evaluationResult
      } catch (error) {
        console.error("💣 [AI Service] 评估过程中发生错误:", error)
-       return this.generateFallbackEvaluation(data, error.message)
+       const message = error instanceof Error ? error.message : String(error);
+       return this.generateFallbackEvaluation(data, message)
      }
    }
 
@@ -291,7 +295,11 @@ ${competenciesText}
           example: "请稍等片刻后，尝试重新提交或刷新页面。如果问题持续存在，请联系技术支持。"
         }
       ],
-      followUpQuestion: "请尝试重新提交，我们期待你的精彩回答！"
+      followUpQuestion: "请尝试重新提交，我们期待你的精彩回答！",
+      expertGuidance: {
+        questionAnalysis: data.questionAnalysis || "不可用",
+        answerFramework: data.answerFramework || "不可用"
+      }
     }
   }
 }

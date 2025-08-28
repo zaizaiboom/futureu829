@@ -3,7 +3,7 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { TrendingUp, Target, Lightbulb, Star, ArrowRight, CheckCircle, AlertCircle, Zap, Brain, BarChart3, ThumbsUp, ThumbsDown, MessageSquareQuestion } from "lucide-react"
+import { TrendingUp, Target, Lightbulb, Star, ArrowRight, CheckCircle, AlertCircle, Zap, Brain, BarChart3, ThumbsUp, ThumbsDown, MessageSquareQuote } from "lucide-react"
 import { useState, useEffect } from "react"
 import { AggregatedReport, IndividualEvaluationResponse } from "@/types/evaluation"
 import { supabase } from "@/lib/supabase/client"
@@ -29,7 +29,7 @@ const isIndividualEvaluation = (data: FeedbackData): data is IndividualEvaluatio
 }
 
 export default function InteractiveFeedback({ feedback, onRetry, onNextQuestion }: InteractiveFeedbackProps) {
-  const [activeTab, setActiveTab] = useState<"summary" | "strengths" | "improvements">("summary")
+  const [activeTab, setActiveTab] = useState<"summary" | "strengths" | "improvements" | "details">("summary")
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
   const [user, setUser] = useState<User | null>(null)
 
@@ -73,7 +73,7 @@ export default function InteractiveFeedback({ feedback, onRetry, onNextQuestion 
   // 获取当前反馈的总结
   const getCurrentSummary = (): string => {
     if (isAggregatedReport(feedback)) {
-      return feedback.overallSummary.overallSummary
+      return feedback.overallSummary.summary
     }
     if (isIndividualEvaluation(feedback)) {
       return feedback.summary
@@ -119,7 +119,7 @@ export default function InteractiveFeedback({ feedback, onRetry, onNextQuestion 
       <div key={`strength-${index}`} className="bg-green-50 p-4 rounded-lg border-l-4 border-green-500">
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <Badge className="bg-green-100 text-green-800 mb-2">{strength.area}</Badge>
+            <Badge className="bg-green-100 text-green-800 mb-2">{strength.competency}</Badge>
             <p className="text-gray-700">{strength.description}</p>
           </div>
           <ThumbsUp className="w-5 h-5 text-green-600 mt-1 flex-shrink-0" />
@@ -134,7 +134,7 @@ export default function InteractiveFeedback({ feedback, onRetry, onNextQuestion 
       return (
         <div key={key} className="bg-orange-50 p-4 rounded-lg border-l-4 border-orange-500">
           <div className="space-y-3">
-            <Badge className="bg-orange-100 text-orange-800">{improvement.area}</Badge>
+            <Badge className="bg-orange-100 text-orange-800">{improvement.competency}</Badge>
             <p className="text-gray-700">{improvement.suggestion}</p>
             {improvement.example && (
               <>
@@ -164,7 +164,7 @@ export default function InteractiveFeedback({ feedback, onRetry, onNextQuestion 
   const renderFollowUpQuestion = (question: string) => (
     <div className="bg-purple-50 p-4 rounded-lg border-l-4 border-purple-500">
       <h4 className="font-semibold text-gray-900 mb-2 flex items-center">
-        <MessageSquareQuestion className="w-5 h-5 mr-2 text-purple-600" />
+        <MessageSquareQuote className="w-5 h-5 mr-2 text-purple-600" />
         深度追问
       </h4>
       <p className="text-gray-700 leading-relaxed">{question}</p>
@@ -256,7 +256,7 @@ export default function InteractiveFeedback({ feedback, onRetry, onNextQuestion 
                 <Card key={`detail-${index}`} className="overflow-hidden">
                   <CardContent className="p-6">
                     <h4 className="font-bold text-lg text-gray-800 mb-4">
-                      第{index + 1}题: {evaluation.questionContent.substring(0, 50)}...
+                      第{index + 1}题: {evaluation.questionContent?.substring(0, 50) ?? '未知问题'}...
                     </h4>
                     <div className="space-y-4">
                       <div>

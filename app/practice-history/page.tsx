@@ -1,7 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-import { Suspense } from 'react'
-import { PracticeHistoryClient } from './client'
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { PracticeHistoryClient } from './client';
+import { QualitativeFeedback } from '@/types/qualitative-feedback';
+import { PracticeSession } from '@/types/practice-session';
+import { Suspense } from 'react';
 
 export const dynamic = 'force-dynamic'
 
@@ -13,39 +16,7 @@ interface AiFeedback {
   competency_scores?: Record<string, number>;
 }
 
-// Define the interface for the processed qualitative feedback
-interface QualitativeFeedback {
-  sessionId: string;
-  practiceDate: string;
-  questionText: string;
-  overallAssessment: {
-    level: string;
-    summary: string;
-  };
-  highlights: { title: string; description: string }[];
-  suggestions: { title: string; description: string; severity?: string }[];
-  actionPlan: { title: string; description: string }[];
-}
 
-interface PracticeSession {
-  id: string
-  overall_score: number
-  content_score: number
-  logic_score: number
-  expression_score: number
-  created_at: string
-  ai_feedback: string | null
-  interview_questions: {
-    question_text: string
-  }
-  interview_stages: {
-    stage_name: string
-  }
-  question_categories: {
-    category_name: string
-  }
-  qualitative_feedback?: QualitativeFeedback
-}
 
 interface PracticeHistoryData {
   user: any
@@ -57,7 +28,7 @@ interface PracticeHistoryData {
 
 async function getPracticeHistoryData(): Promise<PracticeHistoryData | null> {
   try {
-    const supabase = await createClient()
+    const supabase = createServerComponentClient({ cookies })
     
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     
@@ -138,7 +109,12 @@ async function getPracticeHistoryData(): Promise<PracticeHistoryData | null> {
         }
       }
       
-      return { ...session, qualitative_feedback };
+      return { 
+        ...session, 
+        qualitative_feedback, 
+        practice_duration: session.practice_duration ?? 0,
+        ai_feedback: session.ai_feedback ?? ''
+      };
     });
     
     const categories = [...new Set(

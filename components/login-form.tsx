@@ -31,7 +31,7 @@ function SubmitButton() {
   )
 }
 
-export default function LoginForm({ redirectTo }: { redirectTo?: string }) {
+export default function LoginForm({ redirectTo, error }: { redirectTo?: string; error?: string }) {
   const router = useRouter()
   const [state, formAction] = useActionState(signIn, null)
 
@@ -77,6 +77,8 @@ export default function LoginForm({ redirectTo }: { redirectTo?: string }) {
             <Input id="password" name="password" type="password" required className="bg-background border-input" />
           </div>
         </div>
+
+        {error && <p className="text-sm text-red-500">{error}</p>}
 
         {state?.error === 'invalid_credentials' && (
           <p className="text-sm text-red-500">邮箱或密码错误，请重试。</p>

@@ -27,6 +27,13 @@ interface ComparisonAnalysisProps {
     expression_score: number
     overall_score: number
   }
+  growthInsights: {
+    id: string
+    type: 'improvement' | 'strength' | 'concern' | 'opportunity'
+    title: string
+    description: string
+    impact: 'high' | 'medium' | 'low'
+  }[]
 }
 
 interface AnalysisInsight {

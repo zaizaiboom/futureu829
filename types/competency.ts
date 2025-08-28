@@ -21,6 +21,14 @@ export interface Competency {
   // 例如: "在多数回答中能使用结构化方法，但在复杂问题时偶尔出现跳跃。"
 }
 
+export interface CompetencyData {
+  name: string;
+  current: number;
+  previous: number;
+  historical: number;
+  fullMark: number;
+}
+
 // 示例数据
 export const mockCompetencyData: Competency[] = [
   {

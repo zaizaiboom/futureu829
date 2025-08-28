@@ -1,20 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import { SettingsClient } from './client'
+import { User } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
-
-interface UserSettings {
-  id: string
-  email: string
-  user_metadata: {
-    full_name?: string
-    avatar_url?: string
-    [key: string]: any
-  }
-  created_at: string
-}
 
 interface UserPreferences {
   notifications: boolean
@@ -25,13 +16,13 @@ interface UserPreferences {
 }
 
 interface SettingsData {
-  user: UserSettings
+  user: User
   preferences: UserPreferences
 }
 
 async function getSettingsData(): Promise<SettingsData | null> {
   try {
-    const supabase = await createClient()
+    const supabase = createServerComponentClient({ cookies })
     
     // 获取用户信息
     const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -72,12 +63,7 @@ async function getSettingsData(): Promise<SettingsData | null> {
     }
 
     return {
-      user: {
-        id: user.id,
-        email: user.email || '',
-        user_metadata: user.user_metadata || {},
-        created_at: user.created_at || ''
-      },
+      user,
       preferences
     }
   } catch (error) {

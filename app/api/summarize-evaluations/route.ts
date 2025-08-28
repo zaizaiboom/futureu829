@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
         const summaryResult = await getAISummary(individualEvaluations);
 
-        const supabase = createClient();
+        const supabase = await createClient();
         const { error } = await supabase
             .from('evaluation_tasks')
             .upsert({

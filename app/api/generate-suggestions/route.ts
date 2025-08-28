@@ -1,5 +1,5 @@
 import { AIEvaluationService } from '../../../lib/ai-service';
-import { CompetencyData } from '../../../types/evaluation';
+import { CompetencyData } from '../../../types/competency';
 
 const aiService = new AIEvaluationService();
 

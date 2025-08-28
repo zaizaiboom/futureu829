@@ -121,6 +121,7 @@ export default async function LearningReportPage() {
             totalSessions: data.totalSessions,
             averageScore: data.averageScore,
             totalHighlights: 0,
+            totalDuration: 0,
             progressTrend: data.improvementTrend
           }}
         />

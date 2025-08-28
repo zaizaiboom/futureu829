@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import type { Dispatch, SetStateAction } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
@@ -46,22 +47,23 @@ import LoginPrompt from "@/components/LoginPrompt"
 // TypeScript类型定义
 declare global {
   interface SpeechRecognitionEvent extends Event {
+    readonly resultIndex: number
     results: SpeechRecognitionResultList
   }
 
   interface SpeechRecognitionResultList {
-    length: number
+    readonly length: number
     [index: number]: SpeechRecognitionResult
   }
 
   interface SpeechRecognitionResult {
-    isFinal: boolean
+    readonly isFinal: boolean
     [index: number]: SpeechRecognitionAlternative
   }
 
   interface SpeechRecognitionAlternative {
-    transcript: string
-    confidence: number
+    readonly transcript: string
+    readonly confidence: number
   }
 
   interface SpeechRecognitionErrorEvent extends Event {
@@ -123,6 +125,8 @@ const stageConfig = {
 interface InterviewPracticeProps {
   moduleType: "hr" | "professional" | "final"
   onBack: () => void
+  showSuggestion?: boolean
+  setShowSuggestion?: Dispatch<SetStateAction<boolean>>
 }
 
 type EvaluationResult = AggregatedReport;
@@ -285,7 +289,11 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
     } catch (error) {
       console.error('获取音频设备失败:', error)
       setMicrophoneStatus("failed")
-      setTestTranscript(`设备检测失败: ${error.message}`)
+      if (error instanceof Error) {
+        setTestTranscript(`设备检测失败: ${error.message}`)
+      } else {
+        setTestTranscript(`设备检测失败: 发生未知错误`)
+      }
     }
   }
 
@@ -297,7 +305,7 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
         throw new Error('浏览器不支持音频访问功能，请使用现代浏览器')
       }
       
-      if (!window.AudioContext && !window.webkitAudioContext) {
+      if (!window.AudioContext && !(window as any).webkitAudioContext) {
         throw new Error('浏览器不支持Web Audio API，无法进行实时音频分析')
       }
       
@@ -308,7 +316,7 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
       const stream = await navigator.mediaDevices.getUserMedia(constraints)
       setAudioStream(stream)
       
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
       const analyser = audioContext.createAnalyser()
       const microphone = audioContext.createMediaStreamSource(stream)
       
@@ -321,7 +329,6 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
       setIsMonitoringAudio(true)
       
       // 开始音频级别检测循环
-      let animationId: number
       let isRunning = true
       const detectAudioLevel = () => {
         if (analyser && isRunning) {
@@ -339,18 +346,18 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
           
           setRealTimeAudioLevel(normalizedLevel)
           
-          animationId = requestAnimationFrame(detectAudioLevel)
+          const animationId = requestAnimationFrame(detectAudioLevel);
+          (audioContext as any).animationId = animationId
         }
       }
       
       detectAudioLevel()
       
       // 保存动画ID和运行状态以便后续取消
-      audioContext.animationId = animationId
-      audioContext.stopMonitoring = () => {
+      ;(audioContext as any).stopMonitoring = () => {
         isRunning = false
-        if (animationId) {
-          cancelAnimationFrame(animationId)
+        if ((audioContext as any).animationId) {
+          cancelAnimationFrame((audioContext as any).animationId)
         }
       }
       
@@ -359,16 +366,20 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
       setMicrophoneStatus("failed")
       
       // 详细的错误处理
-      if (error.name === 'NotAllowedError') {
-        setTestTranscript('麦克风权限被拒绝，请点击地址栏的麦克风图标允许访问')
-      } else if (error.name === 'NotFoundError') {
-        setTestTranscript('未找到指定的麦克风设备，请检查设备连接或选择其他设备')
-      } else if (error.name === 'NotReadableError') {
-        setTestTranscript('麦克风设备被其他应用占用，请关闭其他使用麦克风的程序')
-      } else if (error.name === 'OverconstrainedError') {
-        setTestTranscript('所选麦克风设备不支持当前配置，请尝试选择其他设备')
+      if (error instanceof Error) {
+        if (error.name === 'NotAllowedError') {
+          setTestTranscript('麦克风权限被拒绝，请点击地址栏的麦克风图标允许访问')
+        } else if (error.name === 'NotFoundError') {
+          setTestTranscript('未找到指定的麦克风设备，请检查设备连接或选择其他设备')
+        } else if (error.name === 'NotReadableError') {
+          setTestTranscript('麦克风设备被其他应用占用，请关闭其他使用麦克风的程序')
+        } else if (error.name === 'OverconstrainedError') {
+          setTestTranscript('所选麦克风设备不支持当前配置，请尝试选择其他设备')
+        } else {
+          setTestTranscript(`音频监控启动失败: ${error.message}`)
+        }
       } else {
-        setTestTranscript(`音频监控启动失败: ${error.message}`)
+        setTestTranscript('音频监控启动失败: 发生未知错误')
       }
     }
   }
@@ -384,8 +395,8 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
     
     if (audioVisualizationContext) {
       // 停止监控循环
-      if (audioVisualizationContext.stopMonitoring) {
-        audioVisualizationContext.stopMonitoring()
+      if ((audioVisualizationContext as any).stopMonitoring) {
+        (audioVisualizationContext as any).stopMonitoring()
       }
       audioVisualizationContext.close()
       setAudioVisualizationContext(null)
@@ -556,12 +567,16 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
       setMicrophoneStatus("failed")
       setMicrophoneTestInProgress(false)
       
-      if (error.name === 'NotAllowedError') {
-        setTestTranscript("麦克风权限被拒绝，请允许网站访问麦克风")
-      } else if (error.name === 'NotFoundError') {
-        setTestTranscript("未找到麦克风设备，请检查设备连接")
+      if (error instanceof Error) {
+        if (error.name === 'NotAllowedError') {
+          setTestTranscript("麦克风权限被拒绝，请允许网站访问麦克风")
+        } else if (error.name === 'NotFoundError') {
+          setTestTranscript("未找到麦克风设备，请检查设备连接")
+        } else {
+          setTestTranscript("麦克风测试失败: " + error.message)
+        }
       } else {
-        setTestTranscript("麦克风测试失败: " + error.message)
+        setTestTranscript("麦克风测试失败: 发生未知错误")
       }
       
       stopAudioMonitoring()
@@ -1034,6 +1049,13 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
   const generateFallbackEvaluation = (): AggregatedReport => {
     return {
       evaluationId: `fallback-${Date.now()}`,
+      stageInfo: {
+        stageType: moduleType,
+        stageTitle: currentStage?.title || "Unknown Stage",
+        questionSetIndex: 0, // Placeholder as it's a fallback
+        questionCount: questions.length,
+      },
+      timestamp: new Date().toISOString(),
       overallSummary: {
         overallLevel: "良好表现",
         summary: "你的回答展现了良好的基础素养和学习态度，在表达逻辑和专业认知方面有不错的表现。",
@@ -1056,17 +1078,19 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
         ],
       },
       individualEvaluations: questions.map((q, i) => ({
-        question: q.question_text,
-        answer: answers[i] || "(未回答)",
-        evaluation: {
-          preliminaryAnalysis: {
-            isValid: true,
-            feedback: "这是一个备用的评估结果。"
-          },
-          performanceLevel: "良好表现",
-          strengths: [],
-          improvements: [],
-          followUpQuestion: "请尝试重新回答这个问题。"
+        questionContent: q.question_text,
+        preliminaryAnalysis: {
+          isValid: true,
+          reasoning: "这是一个备用的评估结果，因为AI服务暂时不可用。"
+        },
+        performanceLevel: "无法评估",
+        summary: "由于服务暂时不可用，这是一个系统生成的备用评估。我们建议您稍后重试以获取完整的AI分析。",
+        strengths: [],
+        improvements: [],
+        followUpQuestion: "准备好后，请告诉我们，我们可以继续下一个问题。",
+        expertGuidance: {
+          questionAnalysis: "由于服务暂时不可用，无法提供问题解析。",
+          answerFramework: "由于服务暂时不可用，无法提供作答框架。"
         }
       }))
     }
@@ -1298,18 +1322,22 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
         
         // 提供更详细的错误信息
         let errorMessage = ''
-        if (error.name === 'NotAllowedError') {
-          errorMessage = '麦克风权限被拒绝。请点击地址栏的麦克风图标，选择"允许"，然后刷新页面重试。'
-        } else if (error.name === 'NotFoundError') {
-          errorMessage = '未找到麦克风设备。请检查麦克风是否正确连接，或尝试重新插拔设备。'
-        } else if (error.name === 'NotReadableError') {
-          errorMessage = '麦克风被其他应用占用。请关闭其他使用麦克风的应用后重试。'
-        } else if (error.name === 'OverconstrainedError') {
-          errorMessage = '麦克风不支持所需的音频格式。请尝试使用其他麦克风设备。'
-        } else if (error.name === 'SecurityError') {
-          errorMessage = '安全限制阻止了麦克风访问。请确保网站使用HTTPS连接。'
+        if (error instanceof Error) {
+          if (error.name === 'NotAllowedError') {
+            errorMessage = '麦克风权限被拒绝。请点击地址栏的麦克风图标，选择"允许"，然后刷新页面重试。'
+          } else if (error.name === 'NotFoundError') {
+            errorMessage = '未找到麦克风设备。请检查麦克风是否正确连接，或尝试重新插拔设备。'
+          } else if (error.name === 'NotReadableError') {
+            errorMessage = '麦克风被其他应用占用。请关闭其他使用麦克风的应用后重试。'
+          } else if (error.name === 'OverconstrainedError') {
+            errorMessage = '麦克风不支持所需的音频格式。请尝试使用其他麦克风设备。'
+          } else if (error.name === 'SecurityError') {
+            errorMessage = '安全限制阻止了麦克风访问。请确保网站使用HTTPS连接。'
+          } else {
+            errorMessage = `无法启动录音功能: ${error.message || error.name || '未知错误'}`
+          }
         } else {
-          errorMessage = `无法启动录音功能: ${error.message || error.name || '未知错误'}`
+          errorMessage = '无法启动录音功能: 发生未知错误'
         }
         
         setSpeechError(errorMessage)
@@ -1781,8 +1809,8 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
                         <div className="flex items-center gap-2 mb-2">
                           <Volume2 className="h-5 w-5 text-green-600" />
                           <span className="font-medium">扬声器测试</span>
-                          <Badge variant={speakerStatus === "working" ? "default" : speakerStatus === "failed" ? "destructive" : "secondary"}>
-                            {speakerStatus === "working" ? "正常" : speakerStatus === "failed" ? "异常" : "未测试"}
+                          <Badge variant={speakerStatus === "success" ? "default" : speakerStatus === "failed" ? "destructive" : "secondary"}>
+                            {speakerStatus === "success" ? "正常" : speakerStatus === "failed" ? "异常" : "未测试"}
                           </Badge>
                         </div>
                         <p className="text-sm text-gray-600 mb-3">请点击播放按钮测试扬声器，确认能听到测试音频</p>
@@ -1832,7 +1860,7 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
                           </div>
                         </div>
                         
-                        {(speakerStatus === "working" || speakerStatus === "failed" || speakerStatus === "success") && (
+                        {(speakerStatus === "failed" || speakerStatus === "success") && (
                           <Button onClick={completeDeviceCheck} className="w-full mt-3" disabled={speakerTestFailed}>
                             完成设备检测
                           </Button>

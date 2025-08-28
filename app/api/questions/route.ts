@@ -121,7 +121,7 @@ export async function GET(request: Request) {
         if (existing) {
           existing.count++
         } else {
-          acc.push({ stage_id: item.stage_id, count: 1, stage_name: item.interview_stages.stage_name })
+          acc.push({ stage_id: item.stage_id, count: 1, stage_name: item.interview_stages?.[0]?.stage_name || '未知阶段' })
         }
         return acc
       }, []) || []

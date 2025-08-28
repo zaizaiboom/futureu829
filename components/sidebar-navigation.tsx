@@ -171,7 +171,7 @@ export default function SidebarNavigation({
             <Avatar className="h-10 w-10">
               <AvatarImage src={avatarUrl || ''} alt={userName || user.email} />
               <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-                {getInitials(user.email, userName)}
+                {getInitials(user.email || '', userName)}
               </AvatarFallback>
             </Avatar>
             {!isCollapsed && (

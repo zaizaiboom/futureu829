@@ -6,13 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Target, Brain, TrendingUp, ArrowLeft } from "lucide-react"
-import InterviewPractice from "../../interview-practice.tsx"
+import InterviewPractice from "../../interview-practice"
 
 // 强制动态渲染
 export const dynamic = 'force-dynamic'
 
 function InterviewPracticeContent() {
-  const [moduleType, setModuleType] = useState("hr")
+  const [moduleType, setModuleType] = useState<"hr" | "professional" | "final">("hr")
   const [showFocusMode, setShowFocusMode] = useState(false)
   const [focusType, setFocusType] = useState<string | null>(null)
   const [showSuggestion, setShowSuggestion] = useState(false)

@@ -51,6 +51,8 @@ export interface IndividualEvaluationResponse {
     questionAnalysis: string
     answerFramework: string
   }
+  questionContent?: string
+  expectedAnswer?: string
 }
 
 /**

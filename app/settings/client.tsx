@@ -10,11 +10,20 @@ import { toast } from 'sonner'
 import Navigation from '@/components/navigation'
 import { supabase } from '@/lib/supabase/client'
 
-interface SettingsClientProps {
-  user: User
+interface UserPreferences {
+  notifications: boolean
+  theme: 'light' | 'dark' | 'system'
+  language: string
+  practiceReminders: boolean
+  emailUpdates: boolean
 }
 
-export function SettingsClient({ user }: SettingsClientProps) {
+interface SettingsClientProps {
+  user: User
+  preferences: UserPreferences
+}
+
+export function SettingsClient({ user, preferences }: SettingsClientProps) {
   const router = useRouter()
 
   const deleteAccount = async () => {
