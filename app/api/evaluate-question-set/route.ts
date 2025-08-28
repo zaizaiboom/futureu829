@@ -157,7 +157,10 @@ console.log("🎯 [API] 开始逐题评估处理:", {
             "提供具体可行的解决方案",
             "考虑技术与商业的平衡"
           ],
-          userAnswer: answers[index] || "未回答"
+          userAnswer: answers[index] || "未回答",
+          stageType: stageType,
+          questionAnalysis: questionAnalysis,
+          answerFramework: answerFramework
         }
         // 返回一个超级备用评估，以确保前端能收到一个有效的对象结构
         const aiService = getAIEvaluationService()
