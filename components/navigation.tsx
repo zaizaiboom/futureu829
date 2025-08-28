@@ -139,7 +139,6 @@ export default function Navigation({ currentPage }: NavigationProps) {
   }
 
   const navigationItems = [
-    { href: '/profile', label: '个人资料', icon: UserIcon, key: 'profile' },
     { href: '/practice-history', label: '练习记录', icon: History, key: 'practice-history' },
     { href: '/learning-report', label: '学习报告', icon: BarChart3, key: 'learning-report' },
     { href: '/settings', label: '设置', icon: Settings, key: 'settings' },

@@ -51,11 +51,6 @@ const navigationItems: NavigationItem[] = [
     icon: BookOpen,
   },
   {
-    href: "/profile",
-    label: "个人资料",
-    icon: UserIcon,
-  },
-  {
     href: "/settings",
     label: "设置",
     icon: Settings,

@@ -36,7 +36,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // --- 你的路由保护逻辑保持不变 ---
-  const protectedRoutes = ['/profile', '/settings', '/learning-report', '/practice-history']
+  const protectedRoutes = ['/settings', '/learning-report', '/practice-history']
   const { pathname } = request.nextUrl
 
   if (!user && protectedRoutes.some(route => pathname.startsWith(route))) {
@@ -47,7 +47,7 @@ export async function middleware(request: NextRequest) {
 
   if (user && pathname === '/auth/login') {
     const redirectTo = request.nextUrl.searchParams.get('redirectTo')
-    return NextResponse.redirect(new URL(redirectTo || '/profile', request.url))
+    return NextResponse.redirect(new URL(redirectTo || '/', request.url))
   }
   // --- 路由保护逻辑结束 ---
 
