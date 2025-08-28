@@ -32,7 +32,13 @@ import {
   Check,
   FileText,
 } from "lucide-react"
-import { getRandomQuestions, getQuestionCount, type Question, getQuestionStats } from "@/lib/questions-service"
+import {
+  getRandomQuestions,
+  getQuestionCount,
+  type Question,
+  getQuestionStats,
+  getRandomCategoryQuestionsInOrder,
+} from "@/lib/questions-service"
 import type { AggregatedReport, IndividualEvaluationResponse } from "@/types/evaluation"
 import { supabase } from "@/lib/supabase/client"
 import LoginPrompt from "@/components/LoginPrompt"
@@ -224,7 +230,7 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
       console.log(`🔍 [前端] 开始加载 ${currentStage.title} 的题目，stageId: ${currentStage.stageId}`)
 
       const [fetchedQuestions, totalCount] = await Promise.all([
-        getRandomQuestions(currentStage.stageId, undefined, 3),
+        getRandomCategoryQuestionsInOrder(currentStage.stageId),
         getQuestionCount(currentStage.stageId),
       ])
 
@@ -233,8 +239,13 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
         fetchedQuestions.map((q) => ({
           id: q.id,
           text: q.question_text.substring(0, 50) + "...",
+          category_id: q.category_id, // 添加 category_id 到日志中
         })),
       )
+      console.log(
+        `📊 [前端] 检查所有题目的 Category ID:`,
+        fetchedQuestions.map((q) => q.category_id)
+      );
       console.log(`📊 [前端] 该阶段题库总数: ${totalCount}`)
 
       setQuestions(fetchedQuestions)

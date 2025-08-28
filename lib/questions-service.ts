@@ -108,6 +108,23 @@ export async function getQuestionsByStage(stageId: number): Promise<Question[]> 
   }
 }
 
+// 根据阶段随机获取一个分类，并按顺序返回该分类下的所有问题
+export async function getRandomCategoryQuestionsInOrder(stageId: number): Promise<Question[]> {
+  try {
+    const url = new URL('/api/questions', window.location.origin);
+    url.searchParams.set('action', 'randomCategoryQuestionsInOrder');
+    url.searchParams.set('stageId', stageId.toString());
+    const response = await fetch(url.toString(), { cache: 'no-store' });
+    if (!response.ok) throw new Error('Failed to fetch random category questions');
+    const { questions } = await response.json();
+    return questions || [];
+  } catch (error) {
+    console.error('Error fetching questions:', error);
+    return [];
+  }
+}
+
+
 // 获取特定阶段的题目数量
 export async function getQuestionCount(stageId: number, categoryId?: number): Promise<number> {
   try {

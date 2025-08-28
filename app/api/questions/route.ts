@@ -54,6 +54,47 @@ export async function GET(request: Request) {
       return NextResponse.json({ questions: questions.slice(0, Math.min(count, questions.length)) })
     }
 
+    if (action === 'randomCategoryQuestionsInOrder') {
+      const stageId = parseInt(searchParams.get('stageId') || '0');
+      console.log('[randomCategoryQuestionsInOrder] Received stageId:', stageId);
+
+      // 1. Get all distinct category_ids from interview_questions for the given stageId
+      const { data: questionCategoryIds, error: categoryIdsError } = await supabase
+        .from('interview_questions')
+        .select('category_id')
+        .eq('stage_id', stageId);
+
+      console.log('[randomCategoryQuestionsInOrder] Distinct category IDs query result:', { questionCategoryIds, categoryIdsError });
+
+      if (categoryIdsError || !questionCategoryIds || questionCategoryIds.length === 0) {
+        return NextResponse.json({ questions: [] });
+      }
+
+      const uniqueCategoryIds = [...new Set(questionCategoryIds.map(item => item.category_id))];
+      console.log('[randomCategoryQuestionsInOrder] Unique category IDs:', uniqueCategoryIds);
+
+
+      // 2. Pick a random categoryId
+      const randomCategoryId = uniqueCategoryIds[Math.floor(Math.random() * uniqueCategoryIds.length)];
+      console.log('[randomCategoryQuestionsInOrder] Randomly selected categoryId:', randomCategoryId);
+
+      // 3. Fetch all questions for the selected category, in order
+      const { data: questions, error: questionsError } = await supabase
+        .from('interview_questions')
+        .select('*')
+        .eq('stage_id', stageId)
+        .eq('category_id', randomCategoryId)
+        .order('id', { ascending: true });
+
+      console.log('[randomCategoryQuestionsInOrder] Questions query result:', { questions, questionsError });
+
+      if (questionsError) {
+        return NextResponse.json({ questions: [] });
+      }
+
+      return NextResponse.json({ questions: questions || [] });
+    }
+
     if (action === 'questionsByStage') {
       const stageId = parseInt(searchParams.get('stageId') || '0')
       const { data, error } = await supabase.from('interview_questions').select('*').eq('stage_id', stageId).order('category_id', { ascending: true })
