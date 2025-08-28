@@ -486,10 +486,10 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
         }
       }
       
-      mediaRecorder.onerror = (event) => {
-        console.error('录音过程中出错:', event)
-        setMicrophoneStatus("failed")
-        setTestTranscript("录音过程中出现错误: " + event.error)
+      mediaRecorder.onerror = (event： MediaRecorderErrorEvent) => {
+        console.error('录音过程中出错:', event);
+        setMicrophoneStatus("failed");
+        setTestTranscript("录音过程中出现错误: " + event.error.name);
         recordingStream.getTracks().forEach(track => track.stop())
       }
       
