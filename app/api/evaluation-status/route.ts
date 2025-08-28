@@ -127,18 +127,5 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// 清理过期数据的工具函数 (现在使用数据库，可以通过cron job或trigger实现)
-export async function cleanupExpiredData() {
-  const supabase = await createClient()
-  const EXPIRY_TIME = '24 hours' // 使用 interval
-  
-  const { error } = await supabase
-    .from('evaluation_tasks')
-    .delete()
-    .lt('updated_at', `now() - interval '${EXPIRY_TIME}'`)
-  
-  if (error) console.error('清理过期数据失败:', error)
-}
-
-// 定期清理过期数据
-setInterval(cleanupExpiredData, 60 * 60 * 1000) // 每小时清理一次
+// 注意：清理过期数据的功能应该通过 Supabase 的 cron job 或 trigger 实现
+// 而不是在 API 路由中使用 setInterval
