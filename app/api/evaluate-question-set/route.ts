@@ -147,6 +147,18 @@ console.log("🎯 [API] 开始逐题评估处理:", {
         // 如果单个评估彻底失败（包括备用方案也失败），则记录错误并返回一个明确的错误状态对象
         console.error(`💥 [API] 第${index + 1}题评估彻底失败（包括备用方案）:`, result.reason)
         
+        let questionAnalysis = '本题的核心考点分析';
+        let answerFramework = '高分答案的建议框架';
+        const { data: qData, error: qError } = await supabase
+          .from('interview_questions')
+          .select('expected_answer, answer_tips')
+          .eq('question_text', questions[index])
+          .single();
+        if (!qError && qData) {
+          questionAnalysis = qData.expected_answer || questionAnalysis;
+          answerFramework = qData.answer_tips || answerFramework;
+        }
+        
         const requestData: EvaluationRequest = {
           question: questions[index],
           category: stageType,
