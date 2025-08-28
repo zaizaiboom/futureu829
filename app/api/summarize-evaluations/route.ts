@@ -79,3 +79,10 @@ export async function POST(request: NextRequest) {
             console.error('Failed to store summary:', error);
             return NextResponse.json({ error: "存储总结失败" }, { status: 500 });
         }
+
+        return NextResponse.json(summaryResult);
+    } catch (error) {
+        console.error('Error in summarize-evaluations:', error);
+        return NextResponse.json({ error: "生成总结时发生错误" }, { status: 500 });
+    }
+}
