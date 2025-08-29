@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Slider } from "@/components/ui/slider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   ArrowLeft,
   Clock,
@@ -124,6 +125,7 @@ const stageConfig = {
 // 组件接口定义
 interface InterviewPracticeProps {
   moduleType: "hr" | "professional" | "final"
+  setModuleType?: (moduleType: "hr" | "professional" | "final") => void
   onBack: () => void
   showSuggestion?: boolean
   setShowSuggestion?: Dispatch<SetStateAction<boolean>>
@@ -131,7 +133,7 @@ interface InterviewPracticeProps {
 
 type EvaluationResult = AggregatedReport;
 
-export default function InterviewPractice({ moduleType = "hr", onBack }: InterviewPracticeProps) {
+export default function InterviewPractice({ moduleType = "hr", setModuleType, onBack }: InterviewPracticeProps) {
   // 类型检查函数
   const isAggregatedReport = (data: any): data is AggregatedReport => {
     return 'individualEvaluations' in data && 'overallSummary' in data;
@@ -1566,6 +1568,9 @@ export default function InterviewPractice({ moduleType = "hr", onBack }: Intervi
             <ArrowLeft className="h-4 w-4" />
             返回模块选择
           </Button>
+          
+
+          
           <div className="flex items-center gap-3">
             <IconComponent className={`h-6 w-6 text-${currentStage.color}-600`} />
             <h1 className="text-2xl font-bold text-gray-900">{currentStage.title}</h1>

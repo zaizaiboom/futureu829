@@ -11,8 +11,10 @@ import InterviewPractice from "../../interview-practice"
 // 强制动态渲染
 export const dynamic = 'force-dynamic'
 
-function InterviewPracticeContent() {
-  const [moduleType, setModuleType] = useState<"hr" | "professional" | "final">("hr")
+function InterviewPracticeContent({ moduleType, setModuleType }: {
+  moduleType: "hr" | "professional" | "final";
+  setModuleType: (moduleType: "hr" | "professional" | "final") => void;
+}) {
   const [showFocusMode, setShowFocusMode] = useState(false)
   const [focusType, setFocusType] = useState<string | null>(null)
   const [showSuggestion, setShowSuggestion] = useState(false)
@@ -21,11 +23,18 @@ function InterviewPracticeContent() {
   
   useEffect(() => {
     const focus = searchParams.get('focus')
+    const module = searchParams.get('module')
+    
     if (focus) {
       setFocusType(focus)
       setShowFocusMode(true)
     }
-  }, [searchParams])
+    
+    // 从URL参数中设置面试模块类型
+    if (module && (module === 'hr' || module === 'professional' || module === 'final')) {
+      setModuleType(module)
+    }
+  }, [searchParams, setModuleType])
   
   const handleBack = () => {
     if (showFocusMode) {
@@ -168,6 +177,7 @@ function InterviewPracticeContent() {
   return (
     <InterviewPractice 
       moduleType={moduleType} 
+      setModuleType={setModuleType}
       onBack={handleBack} 
       showSuggestion={showSuggestion}
       setShowSuggestion={setShowSuggestion}
@@ -176,6 +186,8 @@ function InterviewPracticeContent() {
 }
 
 export default function InterviewPracticePage() {
+  const [moduleType, setModuleType] = useState<"hr" | "professional" | "final">("hr");
+
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
@@ -187,7 +199,7 @@ export default function InterviewPracticePage() {
         </Card>
       </div>
     }>
-      <InterviewPracticeContent />
+      <InterviewPracticeContent moduleType={moduleType} setModuleType={setModuleType} />
     </Suspense>
   )
 }
