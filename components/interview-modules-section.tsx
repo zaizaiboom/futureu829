@@ -66,18 +66,21 @@ export default function InterviewModulesSection({ onStartPractice }: InterviewMo
           const IconComponent = module.icon
           return (
             <Card key={module.id} className={`overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 flex flex-col ${module.bgColor}`}>
-              <CardContent className="p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div className={`p-3 rounded-xl bg-gradient-to-r ${module.color}`}>
-                    <IconComponent className="w-6 h-6 text-white" />
-                  </div>
+              <CardContent className="p-8 flex flex-col flex-grow">
+                <div className="flex justify-end">
                   <Badge variant="secondary" className={`${module.textColor} bg-white/80`}>
                     {module.subtitle}
                   </Badge>
                 </div>
+                
+                <div className="flex flex-col items-center text-center my-4">
+                  <div className={`p-3 rounded-xl bg-gradient-to-r ${module.color} mb-4`}>
+                    <IconComponent className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900">{module.title}</h3>
+                </div>
 
-                <h3 className="text-xl font-bold text-gray-900 mb-3">{module.title}</h3>
-                <p className="text-gray-600 mb-6">{module.description}</p>
+                <p className="text-gray-600 mb-6 text-center">{module.description}</p>
 
                 <div className="grid grid-cols-2 gap-4 mb-6 text-center">
                   <div className="flex items-center justify-center space-x-2">
@@ -104,7 +107,7 @@ export default function InterviewModulesSection({ onStartPractice }: InterviewMo
 
                 <Button
                   onClick={() => onStartPractice(module.key)}
-                  className={`w-full bg-gradient-to-r ${module.color} hover:shadow-lg transition-all duration-300`}
+                  className={`w-full bg-gradient-to-r ${module.color} hover:shadow-lg transition-all duration-300 mt-auto`}
                   size="lg"
                 >
                   <Play className="w-4 h-4 mr-2" />

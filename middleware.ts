@@ -31,9 +31,15 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  let user = null;
+try {
+  const { data: { user: fetchedUser } } = await supabase.auth.getUser();
+  user = fetchedUser;
+} catch (error) {
+  console.error('Error fetching user:', error);
+  // Optionally, clear invalid session
+  await supabase.auth.signOut();
+}
 
   // --- 你的路由保护逻辑保持不变 ---
   const protectedRoutes = ['/settings', '/learning-report', '/practice-history']

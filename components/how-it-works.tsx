@@ -25,7 +25,7 @@ export default function HowItWorks() {
   return (
     <section id="how-it-works" className="py-20 px-6 bg-white">
       <div className="max-w-7xl mx-auto">
-        <h2 className="text-4xl font-bold text-center text-gray-900 mb-16">它是如何工作的？</h2>
+        <h2 className="text-4xl font-bold text-center text-gray-900 mb-16">它能为我带来什么价值</h2>
         <div className="relative">
           {/* Timeline line */}
           <div className="hidden md:block absolute top-1/2 left-0 w-full h-0.5 bg-gray-200 -translate-y-1/2"></div>

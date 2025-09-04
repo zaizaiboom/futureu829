@@ -160,6 +160,7 @@ export default function InterviewPractice({ moduleType = "hr", setModuleType, on
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [speechError, setSpeechError] = useState<string | null>(null)
+  const [networkRetryCount, setNetworkRetryCount] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
   const [interimTranscript, setInterimTranscript] = useState("")
   const [finalTranscript, setFinalTranscript] = useState("")
@@ -1163,7 +1164,22 @@ export default function InterviewPractice({ moduleType = "hr", setModuleType, on
             errorMessage = '麦克风无法正常工作，请检查设备连接'
             break
           case 'network':
-            errorMessage = '网络连接问题，请检查网络后重试'
+            if (networkRetryCount < 3) {
+              setNetworkRetryCount(prev => prev + 1)
+              errorMessage = `网络连接问题，正在尝试重新连接... (${networkRetryCount + 1}/3)`
+              setSpeechError(errorMessage)
+              setTimeout(() => {
+                try {
+                  recognition.start()
+                } catch (e) {
+                  console.error('重试失败:', e)
+                }
+              }, 1000)
+              return
+            } else {
+              errorMessage = '网络连接问题，多次重试失败，请检查网络后重试'
+              setNetworkRetryCount(0)
+            }
             break
           case 'aborted':
             // 用户主动停止，不显示错误
@@ -1174,6 +1190,11 @@ export default function InterviewPractice({ moduleType = "hr", setModuleType, on
         
         setSpeechError(errorMessage)
         setIsRecording(false)
+      }
+
+      recognition.onstart = () => {
+        setNetworkRetryCount(0)
+        setSpeechError(null)
       }
 
       recognition.onend = () => {
@@ -1946,7 +1967,8 @@ export default function InterviewPractice({ moduleType = "hr", setModuleType, on
                       size="sm"
                       onClick={() => setShowSuggestion(!showSuggestion)}
                     >
-                      <Lightbulb className="h-4 w-4" />
+                      <Lightbulb className="h-4 w-4 mr-2" />
+                      答题建议
                     </Button>
                   </div>
                 </CardTitle>
@@ -2042,20 +2064,19 @@ export default function InterviewPractice({ moduleType = "hr", setModuleType, on
                   {/* 语音识别按钮 */}
                   <Button
                     variant={isRecording ? "destructive" : "outline"}
-                    size="sm"
                     onClick={toggleRecording}
-                    className="absolute bottom-3 right-3"
+                    className="absolute bottom-3 right-3 h-12 px-4 rounded-lg shadow-sm"
                   >
                     {isRecording ? (
-                      <>
-                        <Pause className="h-4 w-4" />
-                        停止
-                      </>
+                      <div className="flex items-center gap-2">
+                        <Pause className="h-5 w-5" />
+                        <span className="text-base font-medium">停止</span>
+                      </div>
                     ) : (
-                      <>
-                        <Mic className="h-4 w-4" />
-                        语音
-                      </>
+                      <div className="flex items-center gap-2">
+                        <Mic className="h-5 w-5" />
+                        <span className="text-base font-medium">语音</span>
+                      </div>
                     )}
                   </Button>
                 </div>

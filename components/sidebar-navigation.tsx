@@ -1,40 +1,18 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import Image from "next/image"
-import { 
-  Home, 
-  BarChart3, 
-  BookOpen, 
-  Settings, 
-  User as UserIcon,
-  ChevronLeft,
-  ChevronRight,
-  LogOut
-} from "lucide-react"
-import { supabase } from "@/lib/supabase/client"
-import { cn } from "@/lib/utils"
-import type { User } from "@supabase/supabase-js"
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { ChevronsLeft, ChevronsRight, Home, BarChart3, BookOpen, Settings } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { User } from "@supabase/supabase-js";
 
 interface SidebarNavigationProps {
-  user: User | null
-  isCollapsed?: boolean
-  onToggleCollapse?: () => void
+  user: User | null;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
-interface NavigationItem {
-  href: string
-  label: string
-  icon: React.ComponentType<{ className?: string }>
-  badge?: string
-}
-
-const navigationItems: NavigationItem[] = [
+const navigationItems = [
   {
     href: "/",
     label: "主页",
@@ -50,224 +28,72 @@ const navigationItems: NavigationItem[] = [
     label: "练习记录",
     icon: BookOpen,
   },
-  {
-    href: "/settings",
-    label: "设置",
-    icon: Settings,
-  },
-]
+];
 
-export default function SidebarNavigation({ 
-  user: initialUser,
-  isCollapsed = false, 
-  onToggleCollapse 
-}: SidebarNavigationProps) {
-  const pathname = usePathname()
-  const [user, setUser] = useState(initialUser)
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
-  const [userName, setUserName] = useState<string | null>(null)
-
-  useEffect(() => {
-    setUser(initialUser)
-  }, [initialUser])
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user ?? null)
-      }
-    )
-
-    return () => subscription.unsubscribe()
-  }, [])
-
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      if (!user) {
-        setAvatarUrl(null)
-        setUserName(null)
-        return
-      }
-      
-      try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('avatar_url, full_name, username')
-          .eq('id', user.id)
-          .single()
-        
-        if (profile) {
-          setAvatarUrl(profile.avatar_url)
-          setUserName(profile.full_name || profile.username)
-        }
-      } catch (error) {
-        console.error('Error fetching user profile:', error)
-      }
-    }
-
-    fetchUserProfile()
-  }, [user])
-
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut()
-      setUser(null)
-      setAvatarUrl(null)
-      setUserName(null)
-    } catch (error) {
-      console.error('Error signing out:', error)
-    }
-  }
-
-  const getInitials = (email: string, name?: string | null) => {
-    if (name) {
-      return name.charAt(0).toUpperCase()
-    }
-    return email.charAt(0).toUpperCase()
-  }
-
-  // 移除这个条件，让侧边栏对所有用户可见
+export default function SidebarNavigation({ user, isCollapsed, onToggleCollapse }: SidebarNavigationProps) {
+  const pathname = usePathname();
 
   return (
-    <div className={cn(
-      "fixed left-0 top-0 h-full bg-white/95 backdrop-blur-sm border-r border-gray-200 z-40 transition-all duration-300 ease-in-out",
-      isCollapsed ? "w-16" : "w-64"
+    <aside className={cn(
+      "fixed top-0 left-0 h-full bg-white border-r border-gray-200 transition-all duration-300 ease-in-out z-50",
+      isCollapsed ? "w-16" : "w-56"
     )}>
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center justify-between">
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
           {!isCollapsed && (
-            <Link href="/" className="flex items-center space-x-2">
-              <Image
-                src="/logo.png"
-                alt="FutureU Logo"
-                width={140}
-                height={40}
-                className="object-contain"
-              />
+            <Link href="/" className="flex items-center gap-2">
+              <span className="text-lg font-semibold text-gray-800">FutureU</span>
             </Link>
           )}
-          {onToggleCollapse && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onToggleCollapse}
-              className="p-1 h-8 w-8"
-            >
-              {isCollapsed ? (
-                <ChevronRight className="w-4 h-4" />
-              ) : (
-                <ChevronLeft className="w-4 h-4" />
-              )}
-            </Button>
-          )}
+          <button
+            onClick={onToggleCollapse}
+            className="p-1 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+          >
+            {isCollapsed ? <ChevronsRight className="w-5 h-5 text-gray-600" /> : <ChevronsLeft className="w-5 h-5 text-gray-600" />}
+          </button>
         </div>
-      </div>
-
-      {/* User Status */}
-      <div className="p-4 border-b border-gray-200">
-        {user ? (
-          <div className="flex items-center space-x-3">
-            <Avatar className="h-10 w-10">
-              <AvatarImage src={avatarUrl || ''} alt={userName || user.email} />
-              <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-                {getInitials(user.email || '', userName)}
-              </AvatarFallback>
-            </Avatar>
-            {!isCollapsed && (
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm text-gray-900 truncate">
-                  {userName || user.email}
-                </p>
-                <p className="text-xs text-gray-500 truncate">
-                  {userName ? user.email : 'FutureU 用户'}
-                </p>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="text-center">
-            {!isCollapsed ? (
-              <div className="space-y-3">
-                <div className="w-16 h-16 mx-auto bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                  <UserIcon className="w-8 h-8 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 text-sm">解锁全部功能</h3>
-                  <p className="text-xs text-gray-500 mt-1">登录以保存您的练习记录并查看详细学习报告</p>
-                </div>
-                <Button 
-                  onClick={() => window.location.href = '/auth/login'}
-                  className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
-                  size="sm"
-                >
-                  登录 / 注册
-                </Button>
-              </div>
-            ) : (
-              <div className="w-10 h-10 mx-auto bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                <UserIcon className="w-5 h-5 text-white" />
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Navigation Items */}
-      <nav className="flex-1 p-4">
-        <div className="space-y-2">
+        <nav className="flex-1 mt-4 space-y-1 px-2">
           {navigationItems.map((item) => {
-            const Icon = item.icon
-            const isActive = pathname === item.href
-            
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
             return (
-              <Link key={item.href} href={item.href}>
-                <div className={cn(
-                  "flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors duration-200",
-                  isActive 
-                    ? "bg-blue-50 text-blue-700 border border-blue-200" 
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                )}>
-                  <Icon className={cn(
-                    "w-5 h-5 flex-shrink-0",
-                    isActive ? "text-blue-600" : "text-gray-500"
-                  )} />
-                  {!isCollapsed && (
-                    <>
-                      <span className="font-medium">{item.label}</span>
-                      {item.badge && (
-                        <Badge 
-                          variant="secondary" 
-                          className="ml-auto bg-orange-100 text-orange-700 text-xs px-2 py-0.5"
-                        >
-                          {item.badge}
-                        </Badge>
-                      )}
-                    </>
-                  )}
-                </div>
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex items-center h-10 px-3 rounded-md transition-colors duration-200",
+                  isActive
+                    ? "bg-blue-100 text-blue-600"
+                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
+                  isCollapsed && "justify-center"
+                )}
+              >
+                <Icon className={cn("w-5 h-5", !isCollapsed && "mr-3")} />
+                {!isCollapsed && <span className="text-sm font-medium">{item.label}</span>}
               </Link>
-            )
+            );
           })}
+        </nav>
+        <div className="mt-auto border-t border-gray-200 p-2">
+          <Link
+            href="/settings"
+            className={cn(
+              "flex items-center h-10 px-3 rounded-md transition-colors duration-200",
+              pathname === "/settings"
+                ? "bg-blue-100 text-blue-600"
+                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
+              isCollapsed && "justify-center"
+            )}
+          >
+            <Settings className={cn("w-5 h-5", !isCollapsed && "mr-3")} />
+            {!isCollapsed && (
+              <div className="flex flex-col">
+                <span className="text-sm font-medium">设置</span>
+              </div>
+            )}
+          </Link>
         </div>
-      </nav>
-
-      {/* Logout Button - Only show when user is logged in */}
-      {user && (
-        <div className="p-4 border-t border-gray-200">
-          <Button
-              variant="ghost"
-              onClick={handleLogout}
-              className={cn(
-                "w-full justify-start text-gray-600 hover:text-red-600 hover:bg-red-50",
-                isCollapsed ? "px-2" : "px-3"
-              )}
-            >
-              <LogOut className="w-5 h-5 flex-shrink-0" />
-              {!isCollapsed && <span className="ml-3">退出登录</span>}
-            </Button>
-        </div>
-      )}
-    </div>
-  )
+      </div>
+    </aside>
+  );
 }

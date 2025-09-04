@@ -4,7 +4,7 @@ import { User } from '@supabase/supabase-js'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
-import { Trash2 } from 'lucide-react'
+import { LogOut, Settings, Trash2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import Navigation from '@/components/navigation'
@@ -25,6 +25,12 @@ interface SettingsClientProps {
 
 export function SettingsClient({ user, preferences }: SettingsClientProps) {
   const router = useRouter()
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push('/auth/login')
+    toast.success('已成功退出登录')
+  }
 
   const deleteAccount = async () => {
     try {
@@ -58,11 +64,25 @@ export function SettingsClient({ user, preferences }: SettingsClientProps) {
         <div className="max-w-4xl mx-auto">
           {/* 页面标题 */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">账户设置</h1>
-            <p className="text-gray-600">管理你的账户危险操作</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+              <Settings className="mr-2 h-8 w-8" />
+              设置
+            </h1>
+            <p className="text-gray-600">管理你的账户设置和操作</p>
           </div>
 
           <div className="space-y-6">
+            {/* 常规操作 */}
+            <Card>
+              <CardHeader>
+                <CardTitle>常规操作</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Button onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" /> 退出登录
+                </Button>
+              </CardContent>
+            </Card>
             {/* 危险操作 */}
             <Card className="border-red-200">
               <CardHeader>
@@ -79,12 +99,12 @@ export function SettingsClient({ user, preferences }: SettingsClientProps) {
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive">
                       <Trash2 className="h-4 w-4 mr-2" />
-                      删除账户
+                      注销账户
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>确认删除账户</AlertDialogTitle>
+                      <AlertDialogTitle>确认注销账户</AlertDialogTitle>
                       <AlertDialogDescription>
                         此操作将永久删除你的账户和所有相关数据，包括练习记录、学习报告等。此操作不可撤销。
                       </AlertDialogDescription>

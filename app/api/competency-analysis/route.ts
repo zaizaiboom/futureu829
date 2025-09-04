@@ -70,6 +70,14 @@ type CompetencyResult = Record<string, number>;
  * @param sessions 一组练习会话
  * @returns 各项能力的得分
  */
+const COMPETENCY_DESCRIPTIONS = {
+  '战略思维力': '指的是在产品规划中考虑长期市场趋势和竞争格局的能力，例如制定产品路线图时如何平衡短期收益与长期愿景。',
+  '落地执行力': '指的是将想法转化为实际产品的能力，例如管理项目进度、资源分配和风险控制。',
+  '沟通表达力': '指的是清晰传达想法的能力，例如在会议中有效呈现产品方案。',
+  '团队协作力': '指的是与团队合作的能力，例如协调不同部门共同完成任务。',
+  '创新思维力': '指的是产生新想法的能力，例如设计独特的产品功能。',
+  '学习适应力': '指的是快速学习新知识的能力，例如适应新技术趋势。'
+};
 function calculateCompetencyScores(sessions: CompetencyScores[]): CompetencyResult {
   const competencyNames = Object.keys(COMPETENCY_MODEL);
   
@@ -120,16 +128,16 @@ function generateGrowthInsights(current: CompetencyResult, previous: CompetencyR
     
     if (changePercentage >= ANALYSIS_CONFIG.GROWTH_THRESHOLDS.SIGNIFICANT_PROGRESS) {
       status = 'progress';
-      description = `显著提升！你在${competency}方面表现出色，继续保持这种进步势头。`;
+      description = `显著提升！你在${competency}方面表现出色（${COMPETENCY_DESCRIPTIONS[competency]}）。继续保持这种进步势头。`;
     } else if (changePercentage >= ANALYSIS_CONFIG.GROWTH_THRESHOLDS.PROGRESS) {
       status = 'progress';
-      description = `稳步提升。你在${competency}方面有所进步，建议继续加强练习。`;
+      description = `稳步提升。你在${competency}方面有所进步（${COMPETENCY_DESCRIPTIONS[competency]}）。建议继续加强练习。`;
     } else if (changePercentage <= ANALYSIS_CONFIG.GROWTH_THRESHOLDS.DECLINE) {
       status = 'decline';
-      description = `需要关注。${competency}有所下降，建议重点练习相关技能。`;
+      description = `需要关注。${competency}有所下降（${COMPETENCY_DESCRIPTIONS[competency]}）。建议重点练习相关技能。`;
     } else {
       status = 'stagnant';
-      description = `保持稳定。${competency}维持在当前水平，可以尝试新的挑战来突破。`;
+      description = `保持稳定。${competency}维持在当前水平（${COMPETENCY_DESCRIPTIONS[competency]}）。可以尝试新的挑战来突破。`;
     }
     
     insights.push({

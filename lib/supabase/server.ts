@@ -8,8 +8,10 @@ export const isSupabaseConfigured = !!(process.env.NEXT_PUBLIC_SUPABASE_URL && p
 export const createSupabaseServerClient = cache(async () => {
   const cookieStore = await cookies()
 
+  const supabaseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}?connect_timeout=30`
+
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    supabaseUrl,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
@@ -42,8 +44,10 @@ export const createSupabaseServerClient = cache(async () => {
 export const createClient = cache(async () => {
   const cookieStore = await cookies()
 
+  const supabaseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}?connect_timeout=30`
+
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    supabaseUrl,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {

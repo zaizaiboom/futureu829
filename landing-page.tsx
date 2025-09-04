@@ -55,9 +55,9 @@ export default function LandingPage() {
     <AppShell user={user}>
       <main className="flex-1 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
         <ProductIntro />
+        <InterviewModulesSection onStartPractice={handleStartPractice} />
         <HowItWorks />
         <CoreFeatures />
-        <InterviewModulesSection onStartPractice={handleStartPractice} />
         <QuickTips />
       </main>
     </AppShell>

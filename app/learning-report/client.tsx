@@ -196,7 +196,19 @@ export default function LearningReportClient({ initialData }: LearningReportClie
         <div className="max-w-6xl mx-auto">
           {/* 页面标题 */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">学习报告</h1>
+            <div className="flex items-center justify-between mb-2">
+                <div className="flex items-baseline gap-3">
+                    <h1 className="text-3xl font-bold text-gray-900">学习报告</h1>
+                    {data.sessions.length > 0 && (
+                        <span className="text-gray-600 font-medium">总练习次数: {data.sessions.length}</span>
+                    )}
+                </div>
+              {data.sessions.length > 0 && (
+                <Link href="/practice-history" prefetch={false}>
+                  <Button variant="outline" className="rounded-full">查看练习历史</Button>
+                </Link>
+              )}
+            </div>
             <p className="text-gray-600">深入了解您的学习进展和能力发展</p>
           </div>
 
@@ -214,101 +226,77 @@ export default function LearningReportClient({ initialData }: LearningReportClie
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Left column for Total Practice Sessions */}
-            <div className="lg:col-span-1">
-              <Card className="bg-white rounded-2xl shadow-lg border-0 h-full">
-                <CardContent className="p-6 flex flex-col items-center justify-center text-center h-full">
-                  <CardTitle className="text-lg font-semibold text-gray-600">
-                    总练习次数
-                  </CardTitle>
-                  <div className="text-6xl font-bold text-gray-900 my-6">
-                    {data.sessions.length}
-                  </div>
-                  <Link href="/practice-history" prefetch={false} className="w-full">
-                    <Button variant="outline" className="w-full rounded-full">查看练习历史</Button>
-                  </Link>
-                </CardContent>
-              </Card>
+          <div>
+            <div className="learning-report-card">
+              {isLoadingCompetency ? (
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-center h-64">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                        <p className="text-gray-600">正在分析能力数据...</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : competencyAnalysis ? (
+                 <Tabs defaultValue="assessment" className="w-full">
+                   <TabsList className="grid w-full grid-cols-3 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                     <TabsTrigger
+                       value="assessment"
+                       className="data-[state=active]:bg-white data-[state=active]:shadow-md rounded-md transition-all duration-300"
+                     >
+                       <Target className="w-5 h-5 mr-2" />
+                       能力评估
+                     </TabsTrigger>
+                     <TabsTrigger
+                       value="comparison"
+                       className="data-[state=active]:bg-white data-[state=active]:shadow-md rounded-md transition-all duration-300"
+                     >
+                       <BarChart3 className="w-5 h-5 mr-2" />
+                       对比分析
+                     </TabsTrigger>
+                     <TabsTrigger
+                       value="suggestions"
+                       className="data-[state=active]:bg-white data-[state=active]:shadow-md rounded-md transition-all duration-300"
+                     >
+                       <Lightbulb className="w-5 h-5 mr-2" />
+                       改进建议
+                     </TabsTrigger>
+                   </TabsList>
+                  <TabsContent value="assessment" className="mt-0">
+                      <div className="animate-in fade-in-50 duration-200">
+                        <CompetencyAssessment 
+                          competencyData={competencyAnalysis.competencyData}
+                          lastScores={competencyAnalysis.lastScores}
+                          historicalAverageScores={competencyAnalysis.historicalAverageScores}
+                        />
+                      </div>
+                    </TabsContent>
+                    <TabsContent value="comparison" className="mt-0">
+                      <div className="animate-in fade-in-50 duration-200">
+                        <ComparisonAnalysis 
+                          competencyData={competencyAnalysis.competencyData}
+                          lastScores={competencyAnalysis.lastScores}
+                          historicalAverageScores={competencyAnalysis.historicalAverageScores}
+                          growthInsights={competencyAnalysis.growthInsights}
+                        />
+                      </div>
+                    </TabsContent>
+                    <TabsContent value="suggestions" className="mt-0">
+                      <div className="animate-in fade-in-50 duration-200">
+                        <ActionableSuggestions 
+                          competencyData={competencyAnalysis.competencyData}
+                          lastScores={competencyAnalysis.lastScores}
+                          historicalAverageScores={competencyAnalysis.historicalAverageScores}
+                        />
+                      </div>
+                    </TabsContent>
+                </Tabs>
+              ) : (
+                <CompetencyAssessment />
+              )}
             </div>
-
-            {/* Right column for analysis */}
-            <div className="lg:col-span-3">
-               <div className="learning-report-card">
-                 {isLoadingCompetency ? (
-                   <Card>
-                     <CardContent className="p-6">
-                       <div className="flex items-center justify-center h-64">
-                         <div className="text-center">
-                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
-                           <p className="text-gray-600">正在分析能力数据...</p>
-                         </div>
-                       </div>
-                     </CardContent>
-                   </Card>
-                 ) : competencyAnalysis ? (
-                    <Tabs defaultValue="assessment" className="w-full">
-                      <TabsList className="grid w-full grid-cols-3 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-                        <TabsTrigger
-                          value="assessment"
-                          className="data-[state=active]:bg-white data-[state=active]:shadow-md rounded-md transition-all duration-300"
-                        >
-                          <Target className="w-5 h-5 mr-2" />
-                          能力评估
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="comparison"
-                          className="data-[state=active]:bg-white data-[state=active]:shadow-md rounded-md transition-all duration-300"
-                        >
-                          <BarChart3 className="w-5 h-5 mr-2" />
-                          对比分析
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="suggestions"
-                          className="data-[state=active]:bg-white data-[state=active]:shadow-md rounded-md transition-all duration-300"
-                        >
-                          <Lightbulb className="w-5 h-5 mr-2" />
-                          改进建议
-                        </TabsTrigger>
-                      </TabsList>
-                     <TabsContent value="assessment" className="mt-0">
-                         <div className="animate-in fade-in-50 duration-200">
-                           <CompetencyAssessment 
-                             competencyData={competencyAnalysis.competencyData}
-                             lastScores={competencyAnalysis.lastScores}
-                             historicalAverageScores={competencyAnalysis.historicalAverageScores}
-                           />
-                         </div>
-                       </TabsContent>
-                       <TabsContent value="comparison" className="mt-0">
-                         <div className="animate-in fade-in-50 duration-200">
-                           <ComparisonAnalysis 
-                             competencyData={competencyAnalysis.competencyData}
-                             lastScores={competencyAnalysis.lastScores}
-                             historicalAverageScores={competencyAnalysis.historicalAverageScores}
-                             growthInsights={competencyAnalysis.growthInsights}
-                           />
-                         </div>
-                       </TabsContent>
-                       <TabsContent value="suggestions" className="mt-0">
-                         <div className="animate-in fade-in-50 duration-200">
-                           <ActionableSuggestions 
-                             competencyData={competencyAnalysis.competencyData}
-                             lastScores={competencyAnalysis.lastScores}
-                             historicalAverageScores={competencyAnalysis.historicalAverageScores}
-                           />
-                         </div>
-                       </TabsContent>
-                   </Tabs>
-                 ) : (
-                   <CompetencyAssessment />
-                 )}
-               </div>
-             </div>
-
-
-
-
           </div>
         )}
         </div>
