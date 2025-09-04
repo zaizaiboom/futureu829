@@ -70,7 +70,7 @@ type CompetencyResult = Record<string, number>;
  * @param sessions 一组练习会话
  * @returns 各项能力的得分
  */
-const COMPETENCY_DESCRIPTIONS = {
+const COMPETENCY_DESCRIPTIONS: Record<string, string> = {
   '战略思维力': '指的是在产品规划中考虑长期市场趋势和竞争格局的能力，例如制定产品路线图时如何平衡短期收益与长期愿景。',
   '落地执行力': '指的是将想法转化为实际产品的能力，例如管理项目进度、资源分配和风险控制。',
   '沟通表达力': '指的是清晰传达想法的能力，例如在会议中有效呈现产品方案。',

@@ -42,7 +42,7 @@ try {
 }
 
   // --- 你的路由保护逻辑保持不变 ---
-  const protectedRoutes = ['/settings', '/learning-report', '/practice-history']
+  const protectedRoutes = ['/settings', '/learning-report', '/practice-history', '/interview-practice']
   const { pathname } = request.nextUrl
 
   if (!user && protectedRoutes.some(route => pathname.startsWith(route))) {
