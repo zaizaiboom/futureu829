@@ -29,6 +29,9 @@ interface LearningReportData {
   totalSessions: number
   averageScore: number
   improvementTrend: number
+  actionHandbook: { improvementArea: string; recommendedArticle: string; practiceQuestion: string; thinkingTool: string }
+  growthData: { date: string; [key: string]: number | string }[]
+  abilities: string[]
 }
 
 async function getLearningReportData(): Promise<LearningReportData | null> {
@@ -82,12 +85,31 @@ async function getLearningReportData(): Promise<LearningReportData | null> {
       improvementTrend = recentAvg - previousAvg
     }
 
+    // 模拟新模块数据
+    
+    const actionHandbook = {
+      improvementArea: 'AI问题建模',
+      recommendedArticle: 'AI建模基础',
+      practiceQuestion: '描述一个AI问题的建模过程',
+      thinkingTool: 'SWOT分析'
+    }
+    
+    const abilities = ['产品洞察', 'AI方案构建', '逻辑沟通', '落地迭代']
+    const growthData = [
+      { date: '2023-01', '产品洞察': 60, 'AI方案构建': 50, '逻辑沟通': 70, '落地迭代': 55 },
+      { date: '2023-02', '产品洞察': 65, 'AI方案构建': 55, '逻辑沟通': 75, '落地迭代': 60 },
+      // 添加更多数据点
+    ]
+    
     return {
       user,
       sessions,
       totalSessions,
       averageScore,
-      improvementTrend
+      improvementTrend,
+      actionHandbook,
+      growthData,
+      abilities
     }
   } catch (error) {
     console.error('获取学习报告数据时发生错误:', error)
@@ -103,29 +125,21 @@ export default async function LearningReportPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">学习报告</h1>
-        <p className="text-gray-600">查看您的学习进度和表现分析</p>
+    <Suspense fallback={
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-2 text-gray-600">加载中...</span>
       </div>
-
-      <Suspense fallback={
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span className="ml-2 text-gray-600">加载中...</span>
-        </div>
-      }>
-        <LearningReportClient 
-          initialData={{
-            sessions: data.sessions,
-            totalSessions: data.totalSessions,
-            averageScore: data.averageScore,
-            totalHighlights: 0,
-            totalDuration: 0,
-            progressTrend: data.improvementTrend
-          }}
-        />
-      </Suspense>
-    </div>
+    }>
+      <LearningReportClient 
+        initialData={{
+          sessions: data.sessions,
+          totalSessions: data.totalSessions,
+          actionHandbook: data.actionHandbook,
+          growthData: data.growthData,
+          abilities: data.abilities
+        }}
+      />
+    </Suspense>
   )
 }

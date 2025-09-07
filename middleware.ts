@@ -1,7 +1,11 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export async function middleware(request: NextRequest) {
+  if (request.nextUrl.searchParams.has('_rsc')) {
+    return NextResponse.next();
+  }
   // 1. response 对象只在这里创建一次
   let response = NextResponse.next({
     request: {
@@ -66,6 +70,6 @@ try {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/.*).*)',
   ],
 }

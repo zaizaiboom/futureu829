@@ -54,11 +54,13 @@ export default function LandingPage() {
   return (
     <AppShell user={user}>
       <main className="flex-1 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-        <ProductIntro />
-        <InterviewModulesSection onStartPractice={handleStartPractice} />
-        <HowItWorks />
-        <CoreFeatures />
-        <QuickTips />
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <ProductIntro />
+          <InterviewModulesSection onStartPractice={handleStartPractice} />
+          <HowItWorks />
+          <CoreFeatures />
+          <QuickTips />
+        </div>
       </main>
     </AppShell>
   );

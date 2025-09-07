@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { User } from '@supabase/supabase-js'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,9 @@ import Navigation from '@/components/navigation'
 import { generateMockQualitativeFeedback, qualitativeAnalytics } from '@/lib/qualitative-analytics'
 import { QualitativeFeedback } from '@/types/qualitative-feedback'
 import { PracticeSession } from '@/types/practice-session';
+// Remove import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+// Remove import { Heart } from 'lucide-react';
+// Remove import { FavoriteButton } from "@/components/ui/favorite-button"
 
 interface FilterOptions {
   stage: string
@@ -90,8 +93,6 @@ export function PracticeHistoryClient({ user, sessions, totalSessions, stages, c
     setFilteredSessions(filtered)
   }
 
-
-
   const getStageColor = (stageId: number) => {
     const colors = [
       'bg-purple-100 text-purple-800',
@@ -101,6 +102,26 @@ export function PracticeHistoryClient({ user, sessions, totalSessions, stages, c
     ]
     return colors[(stageId - 1) % colors.length] || 'bg-gray-100 text-gray-800'
   }
+
+  // 按时间分组会话
+  const groupSessions = (sessions: PracticeSession[]) => {
+    const sorted = [...sessions].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const groups: PracticeSession[][] = [];
+    let currentGroup: PracticeSession[] = [];
+    sorted.forEach((session, index) => {
+      if (currentGroup.length === 0 || 
+          Math.abs(new Date(session.created_at).getTime() - new Date(currentGroup[0].created_at).getTime()) < 5 * 60 * 1000) { // within 5 minutes
+        currentGroup.push(session);
+      } else {
+        groups.push(currentGroup);
+        currentGroup = [session];
+      }
+      if (index === sorted.length - 1) groups.push(currentGroup);
+    });
+    return groups;
+  };
+
+  const sessionGroups = useMemo(() => groupSessions(filteredSessions), [filteredSessions]);
 
   const getQualitativeFeedback = (sessionId: string): QualitativeFeedback | undefined => {
     const session = filteredSessions.find(s => s.id === sessionId);
@@ -133,9 +154,11 @@ export function PracticeHistoryClient({ user, sessions, totalSessions, stages, c
       <div className="p-6">
         <div className="max-w-6xl mx-auto">
           {/* 页面标题 */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">练习记录</h1>
-            <p className="text-gray-600">回顾你的面试练习历程，追踪进步轨迹</p>
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">练习记录</h1>
+              <p className="text-gray-600">回顾你的面试练习历程，追踪进步轨迹</p>
+            </div>
           </div>
 
           {/* 筛选和排序工具栏 */}
@@ -226,113 +249,44 @@ export function PracticeHistoryClient({ user, sessions, totalSessions, stages, c
             </Card>
           ) : (
             <div className="relative border-l-2 border-gray-200 pl-8 space-y-10">
-              {filteredSessions.map((session, index) => {
-                const feedback = getQualitativeFeedback(session.id);
-                const displayHighlights = feedback?.highlights?.slice(0, 2) || [];
-                const displaySuggestions = feedback?.suggestions?.slice(0, 2) || [];
-
-                const getSeverityIcon = (severity?: string) => {
-                  switch (severity) {
-                    case 'critical': return <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />;
-                    case 'moderate': return <AlertTriangle className="h-4 w-4 text-orange-500 flex-shrink-0" />;
-                    case 'minor': return <Lightbulb className="h-4 w-4 text-yellow-500 flex-shrink-0" />;
-                    default: return <AlertTriangle className="h-4 w-4 text-orange-500 flex-shrink-0" />;
-                  }
-                };
-
-                return (
-                  <div key={session.id} className="relative">
-                    <div className="absolute -left-[3.2rem] top-1 flex items-center">
-                      <span className="h-4 w-4 bg-white border-2 border-purple-500 rounded-full"></span>
-                      <div className="w-8 border-t-2 border-gray-200"></div>
-                    </div>
-                    <Card className="transition-all duration-300 hover:shadow-xl border rounded-xl overflow-hidden">
-                      <CardHeader className="p-4 bg-gray-50 border-b">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <Calendar className="h-5 w-5 text-gray-500" />
-                            <span className="font-semibold text-gray-800">
-                              {format(new Date(session.created_at), 'yyyy年MM月dd日 HH:mm', { locale: zhCN })}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge className={getStageColor(session.stage_id)}>
-                              {session.interview_stages?.stage_name ?? '未知阶段'}
-                            </Badge>
-                            {session.question_categories?.category_name && (
-                              <Badge variant="outline" className="border-gray-300">
-                                {session.question_categories.category_name}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-6">
-                        <div className="mb-5">
-                          <p className="text-gray-800 font-medium">
-                            {session.interview_questions?.question_text ?? '未知问题'}
-                          </p>
-                        </div>
-
-                        <div className="space-y-6">
-                          <div>
-                            <h4 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                              <History className="h-5 w-5 text-blue-500" />
-                              我的回答
-                            </h4>
-                            <p className="text-gray-700 text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded-md">{session.user_answer || '未提供回答'}</p>
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                              <Lightbulb className="h-5 w-5 text-yellow-500" />
-                              期望答案
-                            </h4>
-                            <p className="text-gray-700 text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded-md">{session.interview_questions?.expected_answer || '暂无期望答案'}</p>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                              <h4 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                                <CheckCircle className="h-5 w-5 text-green-500" />
-                                综合表现亮点
-                              </h4>
-                              <div className="space-y-2">
-                                {displayHighlights.length > 0 ? (
-                                  displayHighlights.map((highlight, index) => (
-                                    <div key={index} className="flex items-start gap-2 text-sm">
-                                      <div className="text-green-500 mt-1">✓</div>
-                                      <span className="text-gray-700">{highlight.title}</span>
-                                    </div>
-                                  ))
-                                ) : (
-                                  <p className="text-gray-500 text-sm">暂无亮点</p>
-                                )}
-                              </div>
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                                <Target className="h-5 w-5 text-red-500" />
-                                综合改进建议
-                              </h4>
-                              <div className="space-y-2">
-                                {displaySuggestions.length > 0 ? (
-                                  displaySuggestions.map((suggestion, index) => (
-                                    <div key={index} className="flex items-start gap-2 text-sm">
-                                      <div className="mt-1">{getSeverityIcon(suggestion.severity)}</div>
-                                      <span className="text-gray-700">{suggestion.title}</span>
-                                    </div>
-                                  ))
-                                ) : (
-                                  <p className="text-gray-500 text-sm">暂无建议</p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
+              {sessionGroups.map((group, groupIndex) => (
+                <div key={groupIndex} className="relative">
+                  <div className="absolute -left-[3.2rem] top-1 flex items-center">
+                    <span className="h-4 w-4 bg-white border-2 border-purple-500 rounded-full"></span>
+                    <div className="w-8 border-t-2 border-gray-200"></div>
                   </div>
-                )
-              })}
+                  <Card className="transition-all duration-300 hover:shadow-xl border rounded-xl overflow-hidden">
+                    <CardHeader className="p-4 bg-gray-50 border-b">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Calendar className="h-5 w-5 text-gray-500" />
+                          <span className="font-semibold text-gray-800">
+                            {format(new Date(group[0].created_at), 'yyyy年MM月dd日 HH:mm', { locale: zhCN })}
+                          </span>
+                        </div>
+                        <Button asChild>
+                          <Link href={`/practice-history/group/${group[0].id}`}>
+                            查看详情
+                          </Link>
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <div className="mb-5">
+                        <p className="text-gray-800 font-medium">面试套题 ({group.length} 道题)</p>
+                        <Badge className="mt-2">{group[0].interview_stages?.stage_name || '未知模块'}</Badge>
+                      </div>
+                      <ul className="space-y-2 mt-4">
+                        {group.map((session, index) => (
+                          <li key={index} className="flex justify-between items-center border-b py-2">
+                            <span>{session.interview_questions?.question_text}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                </div>
+              ))}
             </div>
           )}
         </div>
